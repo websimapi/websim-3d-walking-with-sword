@@ -74,16 +74,16 @@
         document.body.appendChild(renderer.domElement);
         
         // Enhanced Light setup
-        const ambientLight = new THREE.AmbientLight(0x404040, 0.5); // Reduced intensity
+        const ambientLight = new THREE.AmbientLight(0x404040, 1.0); 
         scene.add(ambientLight);
         
-        // Main directional light (sun)
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        // Main directional light (sun) - adjusted for brighter scene
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.8); 
         directionalLight.position.set(50, 100, 50);
         directionalLight.castShadow = true;
-        // Improve shadow quality
-        directionalLight.shadow.mapSize.width = 2048;
-        directionalLight.shadow.mapSize.height = 2048;
+        // Enhanced shadow quality
+        directionalLight.shadow.mapSize.width = 4096; 
+        directionalLight.shadow.mapSize.height = 4096; 
         directionalLight.shadow.camera.near = 0.5;
         directionalLight.shadow.camera.far = 500;
         directionalLight.shadow.camera.left = -100;
@@ -91,10 +91,11 @@
         directionalLight.shadow.camera.top = 100;
         directionalLight.shadow.camera.bottom = -100;
         directionalLight.shadow.bias = -0.0001;
+        directionalLight.shadow.normalBias = 0.02; 
         scene.add(directionalLight);
 
         // Add hemisphere light for better ambient lighting
-        const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8);
+        const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2); 
         scene.add(hemisphereLight);
 
         // Ground plane
@@ -211,17 +212,19 @@
                         transparent: true,
                         side: THREE.DoubleSide,
                         alphaTest: 0.5,
-                        roughness: 0.3,
-                        metalness: 0.7,
-                        envMapIntensity: 1.0
+                        roughness: 0.2, 
+                        metalness: 0.8, 
+                        envMapIntensity: 1.5  
                     });
                     
                     const swordGeometry = new THREE.PlaneGeometry(1, 1);
                     sword = new THREE.Mesh(swordGeometry, swordMaterial);
                     
+                    // Enhanced shadow settings for sword
                     sword.castShadow = true;
                     sword.receiveShadow = true;
-                    
+                    sword.frustumCulled = false; 
+
                     sword.rotation.y = Math.PI / 2;
                     sword.rotation.z = -Math.PI / 8;
                     sword.rotation.x = Math.PI / 6 + Math.PI; 
