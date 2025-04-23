@@ -150,6 +150,14 @@
         .small-button:hover {
             background: #666;
         }
+        /* Control hints in inventory */
+        .control-hint {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            color: #aaa;
+            font-size: 12px;
+        }
     </style>
     <script type="importmap">
     {
@@ -166,9 +174,10 @@
         <p>Please wait while the AI creates your weapon</p>
     </div>
     
-    <div id="instructions">
+    <!-- Instructions div is kept for compatibility but not shown by default -->
+    <div id="instructions" style="display: none;">
         <p>WASD or Arrow Keys: Move | Mouse: Look around | Left Click: Swing Sword</p>
-        <p>Press ESC to open menu | Generate new swords or select from your collection</p>
+        <p>Press ESC or I to open inventory | Generate new swords or select from your collection</p>
         <button id="regenerate-btn">Regenerate Sword</button>
     </div>
     
@@ -183,6 +192,7 @@
             <button id="equip-btn">Equip Selected</button>
             <button id="close-inventory-btn">Close</button>
         </div>
+        <div class="control-hint">WASD or Arrow Keys: Move | Mouse: Look around | Left Click: Swing Sword</div>
     </div>
     
     <script type="module">
@@ -412,14 +422,22 @@
         });
         
         controls.addEventListener('unlock', function() {
-            // Don't automatically show instructions when unlocked
-            // Only show when ESC is pressed
+            // Don't show anything on unlock
         });
         
-        // Handle ESC key to show menu
+        // Handle ESC key and I key to open inventory
         document.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape') {
-                handleEscapeKey();
+            if (event.key === 'Escape' || event.key === 'i' || event.key === 'I') {
+                if (controls.isLocked) {
+                    controls.unlock();
+                    setTimeout(() => {
+                        showInventory();
+                        menuOpen = true;
+                    }, 100);
+                } else if (!inventoryContainer.style.display || inventoryContainer.style.display === 'none') {
+                    showInventory();
+                    menuOpen = true;
+                }
             }
             
             switch(event.code) {
@@ -442,27 +460,14 @@
             }
         });
         
-        function handleEscapeKey() {
-            if (controls.isLocked) {
-                controls.unlock();
-                setTimeout(() => {
-                    instructionsElement.style.display = 'flex';
-                    menuOpen = true;
-                }, 100);
-            } else if (!inventoryContainer.style.display || inventoryContainer.style.display === 'none') {
-                instructionsElement.style.display = 'flex';
-                menuOpen = true;
-            }
-        }
-        
-        // Show inventory UI
+        // Show inventory UI directly
         function showInventory() {
-            instructionsElement.style.display = 'none';
+            instructionsElement.style.display = 'none'; // Ensure instructions are hidden
             inventoryContainer.style.display = 'flex';
             updateInventoryUI();
         }
         
-        // Handle regenerate button click - now adds to inventory
+        // Handle regenerate button click - now directly in inventory
         document.getElementById('regenerate-btn').addEventListener('click', function() {
             showInventory();
             generateNewSword();
@@ -486,7 +491,8 @@
         
         function closeInventory() {
             inventoryContainer.style.display = 'none';
-            instructionsElement.style.display = 'flex';
+            // Re-lock controls when closing inventory
+            controls.lock();
         }
         
         // Generate sword using AI and add to inventory
