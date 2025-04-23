@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { scene, camera } from './sceneSetup.js';
 import { removeSwordBackground } from './utils.js';
+import { checkSwordCollision } from './collision.js';
 
 // Sword and hand positioning
 export let handOffset = new THREE.Object3D();
@@ -12,12 +13,22 @@ export const swordInventory = [];
 export let currentSwordIndex = -1;
 export let selectedSwordIndex = -1;
 
+// Sword collision state
+export const swordCollisionState = {
+    isColliding: false,
+    collisionPoint: null,
+    collisionNormal: null,
+    originalPosition: new THREE.Vector3(),
+    originalRotation: new THREE.Euler()
+};
+
 // Swing animation state
 export const swingState = {
     isSwinging: false,
     swingProgress: 0,
     swingDirection: 1,
-    swingDuration: 0.25
+    swingDuration: 0.25,
+    collisionBlocked: false
 };
 
 export function initSword(camera) {
@@ -101,6 +112,7 @@ export function equipSword(index) {
         // Reset swing state
         swingState.isSwinging = false;
         swingState.swingProgress = 0;
+        swingState.collisionBlocked = false;
         
         // Create the sword with the selected texture
         const swordTexture = new THREE.TextureLoader().load(swordInventory[index].processedUrl);
@@ -134,6 +146,10 @@ export function equipSword(index) {
         
         handOffset.add(sword);
         
+        // Store original position and rotation for collision detection
+        swordCollisionState.originalPosition.copy(sword.position);
+        swordCollisionState.originalRotation.copy(sword.rotation);
+        
         // Add sword glow effect
         addSwordGlowEffect();
     }
@@ -144,6 +160,11 @@ export function handleSwordSwing() {
         swingState.isSwinging = true;
         swingState.swingProgress = 0;
         swingState.swingDirection = 1; // Start with forward swing
+        swingState.collisionBlocked = false;
+        
+        // Reset collision state
+        swordCollisionState.isColliding = false;
+        swordCollisionState.collisionPoint = null;
         
         // Enable sword glow effects during swing
         swordGlowEffects.children.forEach(light => {
@@ -155,10 +176,34 @@ export function handleSwordSwing() {
             sword.material.emissive = new THREE.Color(0x4466ff);
             sword.material.emissiveIntensity = 0.8;
         }
-        
-        // Play sword swing sound
-        playSwingSound();
     }
+}
+
+// Function to check sword collision during swing
+export function checkSwordCollisionInSwing() {
+    if (!sword || !swingState.isSwinging) return false;
+    
+    // Get swing direction vector (perpendicular to sword plane in its current rotation)
+    const swingDirection = new THREE.Vector3(0, 0, 1);
+    swingDirection.applyQuaternion(sword.getWorldQuaternion(new THREE.Quaternion()));
+    
+    // Check for collision with scene objects
+    const collision = checkSwordCollision(sword, swingDirection);
+    
+    // If we have a collision and weren't blocked before
+    if (collision.collided && !swingState.collisionBlocked) {
+        swordCollisionState.isColliding = true;
+        swordCollisionState.collisionPoint = collision.point;
+        swordCollisionState.collisionNormal = collision.normal;
+        swingState.collisionBlocked = true;
+        
+        // Create a small spark effect at the collision point
+        createCollisionEffect(collision.point);
+        
+        return true;
+    }
+    
+    return false;
 }
 
 // Function to create a glow effect around the sword
@@ -176,29 +221,67 @@ function addSwordGlowEffect() {
     swordGlowEffects.add(secondGlowLight);
 }
 
-// Add a sound effect for sword swings
-function playSwingSound() {
-    // Create a simple synth sound for the sword swing
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+// Create visual effect when sword collides with something
+function createCollisionEffect(point) {
+    // Spark particles using points
+    const sparkGeo = new THREE.BufferGeometry();
+    const sparkPositions = [];
+    const sparkCount = 15;
     
-    // Create an oscillator
-    const oscillator = audioContext.createOscillator();
-    oscillator.type = 'triangle';
-    oscillator.frequency.setValueAtTime(440, audioContext.currentTime);
-    oscillator.frequency.exponentialRampToValueAtTime(880, audioContext.currentTime + 0.1);
+    for (let i = 0; i < sparkCount; i++) {
+        const spread = 0.1;
+        sparkPositions.push(
+            point.x + (Math.random() - 0.5) * spread,
+            point.y + (Math.random() - 0.5) * spread,
+            point.z + (Math.random() - 0.5) * spread
+        );
+    }
     
-    // Create a gain node for volume control
-    const gainNode = audioContext.createGain();
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+    sparkGeo.setAttribute('position', new THREE.Float32BufferAttribute(sparkPositions, 3));
     
-    // Connect the nodes
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
+    const sparkMaterial = new THREE.PointsMaterial({
+        color: 0x88ccff,
+        size: 0.03,
+        transparent: true,
+        opacity: 1.0
+    });
     
-    // Start and stop the sound
-    oscillator.start();
-    oscillator.stop(audioContext.currentTime + 0.3);
+    const sparks = new THREE.Points(sparkGeo, sparkMaterial);
+    scene.add(sparks);
+    
+    // Add a flash light at collision point
+    const flashLight = new THREE.PointLight(0x44aaff, 2, 2);
+    flashLight.position.copy(point);
+    scene.add(flashLight);
+    
+    // Remove particles and light after animation
+    const duration = 500; // ms
+    setTimeout(() => {
+        scene.remove(sparks);
+        scene.remove(flashLight);
+    }, duration);
+    
+    // Add a tiny sound effect if Web Audio API is available
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(220, audioContext.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+        
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.2);
+    } catch (e) {
+        // Audio not supported, ignore
+    }
 }
 
 // Add this setter function to properly update the selectedSwordIndex

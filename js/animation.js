@@ -1,8 +1,7 @@
 import * as THREE from 'three';
 import { composer, scene, camera } from './sceneSetup.js';
 import { controls, movementState } from './controls.js';
-import { sword, handOffset, swordGlowEffects, swingState } from './sword.js';
-import { updatePhysics } from './physics.js';
+import { sword, handOffset, swordGlowEffects, swingState, swordCollisionState, checkSwordCollisionInSwing } from './sword.js';
 
 // Animation clock
 const clock = new THREE.Clock();
@@ -22,9 +21,6 @@ function animate() {
     
     // Handle sword animation
     updateSwordAnimation(delta);
-    
-    // Update physics simulation
-    updatePhysics(delta);
     
     // Use composer instead of renderer
     composer.render();
@@ -51,8 +47,16 @@ function updateSwordAnimation(delta) {
     if (!sword) return;
     
     if (swingState.isSwinging) {
+        // Check for collision during swing
+        const hasCollided = checkSwordCollisionInSwing();
+        
         // Update swing progress
-        swingState.swingProgress += delta * swingState.swingDirection / swingState.swingDuration;
+        if (!swingState.collisionBlocked) {
+            swingState.swingProgress += delta * swingState.swingDirection / swingState.swingDuration;
+        } else {
+            // If collision occurred, slow down the return animation
+            swingState.swingProgress += delta * swingState.swingDirection / (swingState.swingDuration * 1.5);
+        }
         
         if (swingState.swingDirection === 1 && swingState.swingProgress >= 1) {
             // Switch to return swing
@@ -62,6 +66,7 @@ function updateSwordAnimation(delta) {
             // End swing animation
             swingState.swingProgress = 0;
             swingState.isSwinging = false;
+            swingState.collisionBlocked = false;
             
             // Disable sword glow effects
             swordGlowEffects.children.forEach(light => {
@@ -85,10 +90,32 @@ function updateSwordAnimation(delta) {
             easeInOutQuad(swingState.swingProgress) : 
             1 - easeInOutQuad(1 - swingState.swingProgress);
         
-        // Apply swing animation 
-        sword.rotation.z = baseRotZ - curve * 1.5; 
-        sword.rotation.x = baseRotX + curve * 1.0; 
-        sword.rotation.y = baseRotY;
+        // If collision occurred during the forward swing, limit the swing rotation
+        if (swingState.collisionBlocked && swingState.swingDirection === 1) {
+            // Find collision point in the swing trajectory and stop there
+            // We'll limit the maximum rotation to the current point
+            const maxCurve = Math.min(curve, swingState.swingProgress);
+            
+            // Apply limited swing animation
+            sword.rotation.z = baseRotZ - maxCurve * 1.5;
+            sword.rotation.x = baseRotX + maxCurve * 1.0;
+            sword.rotation.y = baseRotY;
+            
+            // Add a slight bounce effect on collision
+            if (swordCollisionState.isColliding) {
+                // Small rotation in the opposite direction to create a rebound effect
+                sword.rotation.z += Math.sin(clock.elapsedTime * 30) * 0.1 * (1 - swingState.swingProgress);
+                sword.rotation.x -= Math.cos(clock.elapsedTime * 30) * 0.05 * (1 - swingState.swingProgress);
+                
+                // Fade out the collision effect gradually
+                swordCollisionState.isColliding = swingState.swingProgress > 0.3;
+            }
+        } else {
+            // Normal swing animation without collision
+            sword.rotation.z = baseRotZ - curve * 1.5; 
+            sword.rotation.x = baseRotX + curve * 1.0; 
+            sword.rotation.y = baseRotY;
+        }
         
         // Animate glow intensity based on swing
         if (sword.material) {
