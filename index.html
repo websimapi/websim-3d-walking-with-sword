@@ -67,27 +67,72 @@
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadows
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
         document.body.appendChild(renderer.domElement);
         
-        // Light setup
-        const ambientLight = new THREE.AmbientLight(0x404040);
+        // Enhanced lighting setup
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
         scene.add(ambientLight);
         
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(1, 1, 0.5);
+        // Main directional light (sun)
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        directionalLight.position.set(5, 10, 7);
         directionalLight.castShadow = true;
+        // Configure shadow map
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        directionalLight.shadow.camera.near = 0.5;
+        directionalLight.shadow.camera.far = 50;
+        directionalLight.shadow.camera.left = -15;
+        directionalLight.shadow.camera.right = 15;
+        directionalLight.shadow.camera.top = 15;
+        directionalLight.shadow.camera.bottom = -15;
+        directionalLight.shadow.bias = -0.0005;
         scene.add(directionalLight);
         
-        // Ground plane
+        // Add a hemisphere light for better ambient lighting
+        const hemisphereLight = new THREE.HemisphereLight(0x87ceeb, 0x3d3d3d, 0.6);
+        scene.add(hemisphereLight);
+        
+        // Ground plane with better material for shadows
         const planeGeometry = new THREE.PlaneGeometry(2000, 2000);
         const planeMaterial = new THREE.MeshStandardMaterial({ 
             color: 0x339933,
-            side: THREE.DoubleSide
+            side: THREE.DoubleSide,
+            roughness: 0.8,
+            metalness: 0.1
         });
         const plane = new THREE.Mesh(planeGeometry, planeMaterial);
         plane.rotation.x = -Math.PI / 2;
         plane.receiveShadow = true;
         scene.add(plane);
+        
+        // Add some scattered objects to show shadows
+        function createRandomObjects() {
+            const objects = [];
+            for (let i = 0; i < 30; i++) {
+                const geometry = new THREE.BoxGeometry(1, Math.random() * 2 + 0.5, 1);
+                const material = new THREE.MeshStandardMaterial({
+                    color: Math.random() * 0xffffff,
+                    roughness: 0.7,
+                    metalness: 0.2
+                });
+                const cube = new THREE.Mesh(geometry, material);
+                cube.position.x = Math.random() * 100 - 50;
+                cube.position.z = Math.random() * 100 - 50;
+                cube.position.y = geometry.parameters.height / 2;
+                cube.castShadow = true;
+                cube.receiveShadow = true;
+                scene.add(cube);
+                objects.push(cube);
+            }
+            return objects;
+        }
+        
+        const sceneObjects = createRandomObjects();
         
         // Controls setup
         const controls = new PointerLockControls(camera, document.body);
@@ -158,6 +203,14 @@
             }
         }
         
+        // Create light that follows the player to illuminate the sword
+        const swordLight = new THREE.PointLight(0xffffff, 0.8, 3);
+        swordLight.castShadow = true;
+        swordLight.shadow.mapSize.width = 512;
+        swordLight.shadow.mapSize.height = 512;
+        camera.add(swordLight);
+        swordLight.position.set(0.5, -0.2, -0.5);
+        
         // Modify the hand offset position and rotation for better visibility
         let sword = null;
         let handOffset = new THREE.Object3D();
@@ -184,11 +237,14 @@
                     const swordTexture = new THREE.TextureLoader().load(transparentSwordUrl);
                     swordTexture.flipY = false;
                     
-                    const swordMaterial = new THREE.MeshBasicMaterial({ 
+                    // Use MeshStandardMaterial instead of MeshBasicMaterial for light interaction
+                    const swordMaterial = new THREE.MeshStandardMaterial({ 
                         map: swordTexture,
                         transparent: true,
                         side: THREE.DoubleSide,
-                        alphaTest: 0.5 
+                        alphaTest: 0.5,
+                        roughness: 0.3,
+                        metalness: 0.7
                     });
                     
                     const swordGeometry = new THREE.PlaneGeometry(1, 1);
@@ -197,8 +253,33 @@
                     sword.rotation.y = Math.PI / 2;
                     sword.rotation.z = -Math.PI / 8;
                     sword.rotation.x = Math.PI / 6 + Math.PI; 
+                    sword.castShadow = true; // Enable sword shadow
+                    
+                    // Add a second plane with slight offset to give the sword more volume
+                    const swordBackGeometry = new THREE.PlaneGeometry(1, 1);
+                    const swordBackMaterial = new THREE.MeshStandardMaterial({
+                        map: swordTexture,
+                        transparent: true,
+                        side: THREE.DoubleSide,
+                        alphaTest: 0.5,
+                        roughness: 0.3,
+                        metalness: 0.7
+                    });
+                    
+                    const swordBack = new THREE.Mesh(swordBackGeometry, swordBackMaterial);
+                    swordBack.position.z = -0.01;
+                    swordBack.rotation.y = Math.PI / 2;
+                    swordBack.rotation.z = -Math.PI / 8;
+                    swordBack.rotation.x = Math.PI / 6 + Math.PI;
+                    swordBack.castShadow = true;
+                    
+                    // Create a glow effect for the sword
+                    const swordGlow = new THREE.PointLight(0x6688ff, 1, 2);
+                    swordGlow.position.set(0, 0, 0);
                     
                     handOffset.add(sword);
+                    handOffset.add(swordBack);
+                    handOffset.add(swordGlow);
                     
                     document.getElementById('loading').style.display = 'none';
                     
@@ -247,6 +328,10 @@
             return canvas.toDataURL();
         }
         
+        // Ray caster for sword shadow interaction
+        const raycaster = new THREE.Raycaster();
+        const rayDirection = new THREE.Vector3(0, -1, 0);
+        
         // Animation loop
         const clock = new THREE.Clock();
         
@@ -268,9 +353,33 @@
             controls.moveForward(-velocity.z * delta);
             
             if (sword) {
+                // Add subtle sword animation
                 sword.rotation.z = -Math.PI / 8 + Math.sin(clock.elapsedTime * 2) * 0.05;
-                sword.rotation.x = Math.PI / 6 + Math.PI; 
+                sword.rotation.x = Math.PI / 6 + Math.PI + Math.sin(clock.elapsedTime) * 0.02; 
+                
+                // Cast rays from the sword to calculate shadow projection
+                // This is for visual effects only
+                if (clock.elapsedTime % 0.5 < 0.1) { // Only do this check occasionally for performance
+                    const swordWorldPosition = new THREE.Vector3();
+                    sword.getWorldPosition(swordWorldPosition);
+                    
+                    raycaster.set(swordWorldPosition, rayDirection);
+                    const intersects = raycaster.intersectObject(plane);
+                    
+                    if (intersects.length > 0) {
+                        // Here we could add additional shadow effects if needed
+                    }
+                }
             }
+            
+            // Animate the scene objects
+            sceneObjects.forEach((obj, index) => {
+                obj.rotation.y += 0.01 * (index % 3 + 1);
+            });
+            
+            // Animate the lighting
+            directionalLight.position.x = Math.sin(clock.elapsedTime * 0.1) * 10;
+            directionalLight.position.z = Math.cos(clock.elapsedTime * 0.1) * 10;
             
             renderer.render(scene, camera);
         }
