@@ -39,19 +39,8 @@ export function initSword(camera) {
     
     // Add listener for remote sword swing requests
     if (room) {
-        room.subscribePresenceUpdateRequests((updateRequest, fromClientId) => {
-            if (updateRequest.type === 'swordSwingTrigger') {
-                handleSwordSwing(updateRequest.intensity);
-                
-                // Broadcast swing event to all players
-                room.send({
-                    type: 'swordSwing',
-                    clientId: room.clientId,
-                    username: room.peers[room.clientId]?.username || 'Unknown Player',
-                    intensity: updateRequest.intensity || 1
-                });
-            }
-        });
+        // This has been moved to pairingSystem.js, and the functionality will be called from there
+        // TOMBSTONE: removed room.subscribePresenceUpdateRequests for sword swing triggers
     }
 }
 

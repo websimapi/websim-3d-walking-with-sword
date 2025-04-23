@@ -3,7 +3,7 @@ import { PointerLockControls } from 'three/addons/controls/PointerLockControls.j
 import { camera } from './sceneSetup.js';
 import { showInventory } from './inventory.js';
 import { handleSwordSwing } from './sword.js';
-import { isDesktop, updatePlayerPosition } from './multiplayer.js';
+import { updatePlayerPosition, isDesktop } from './multiplayer.js';
 
 // Movement state
 export const movementState = {
