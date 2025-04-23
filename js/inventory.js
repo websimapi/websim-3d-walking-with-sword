@@ -1,5 +1,5 @@
 import { controls } from './controls.js';
-import { swordInventory, selectedSwordIndex, equipSword, generateNewSword } from './sword.js';
+import { swordInventory, selectedSwordIndex, equipSword, generateNewSword, setSelectedSwordIndex } from './sword.js';
 
 export function initInventorySystem(controls) {
     // UI elements
@@ -83,8 +83,7 @@ export function updateInventoryUI() {
 }
 
 export function selectSword(index) {
-    import('./sword.js').then(module => {
-        module.selectedSwordIndex = index;
-        updateInventoryUI();
-    });
+    // Fix: Using the setter function instead of trying to modify the module property directly
+    setSelectedSwordIndex(index);
+    updateInventoryUI();
 }

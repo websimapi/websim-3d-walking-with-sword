@@ -172,3 +172,8 @@ function addSwordGlowEffect() {
     secondGlowLight.visible = false; // Start with lights off
     swordGlowEffects.add(secondGlowLight);
 }
+
+// Add this setter function to properly update the selectedSwordIndex
+export function setSelectedSwordIndex(index) {
+    selectedSwordIndex = index;
+}
