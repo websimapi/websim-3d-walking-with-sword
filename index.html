@@ -31,9 +31,7 @@
             background: rgba(0, 0, 0, 0.5);
             padding: 10px;
             border-radius: 5px;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
+            display: none; /* Hide by default */
         }
         #regenerate-btn {
             margin-top: 10px;
@@ -52,6 +50,106 @@
         #regenerate-btn:active {
             transform: scale(0.95);
         }
+        /* Sword Inventory Styles */
+        #inventory-container {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            max-width: 800px;
+            max-height: 80vh;
+            background: rgba(0, 0, 0, 0.85);
+            border-radius: 8px;
+            padding: 20px;
+            color: white;
+            font-family: Arial, sans-serif;
+            display: none;
+            flex-direction: column;
+            z-index: 1001;
+            overflow: hidden;
+        }
+        #inventory-title {
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 24px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+        }
+        #sword-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 15px;
+            overflow-y: auto;
+            max-height: 60vh;
+            padding: 10px;
+        }
+        .sword-item {
+            background: rgba(30, 30, 40, 0.8);
+            border-radius: 5px;
+            padding: 5px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+        .sword-item:hover {
+            background: rgba(50, 50, 70, 0.8);
+        }
+        .sword-item.selected {
+            border-color: #4466ff;
+            box-shadow: 0 0 10px #4466ff;
+        }
+        .sword-preview {
+            width: 100px;
+            height: 100px;
+            object-fit: contain;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 3px;
+        }
+        .sword-label {
+            margin-top: 5px;
+            font-size: 12px;
+            text-align: center;
+        }
+        #inventory-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+        }
+        #inventory-buttons button {
+            padding: 8px 15px;
+            background: #333;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        #inventory-buttons button:hover {
+            background: #444;
+        }
+        #equip-btn {
+            background: #4466ff;
+        }
+        #equip-btn:hover {
+            background: #5577ff;
+        }
+        .small-button {
+            font-size: 12px;
+            padding: 3px 8px;
+            margin-top: 4px;
+            background: #555;
+            border: none;
+            border-radius: 3px;
+            color: white;
+            cursor: pointer;
+        }
+        .small-button:hover {
+            background: #666;
+        }
     </style>
     <script type="importmap">
     {
@@ -67,10 +165,26 @@
         <h2>Generating your sword...</h2>
         <p>Please wait while the AI creates your weapon</p>
     </div>
+    
     <div id="instructions">
         <p>WASD or Arrow Keys: Move | Mouse: Look around | Left Click: Swing Sword</p>
+        <p>Press ESC to open menu | Generate new swords or select from your collection</p>
         <button id="regenerate-btn">Regenerate Sword</button>
     </div>
+    
+    <!-- Sword Inventory UI -->
+    <div id="inventory-container">
+        <div id="inventory-title">Sword Inventory</div>
+        <div id="sword-grid">
+            <!-- Sword items will be added here dynamically -->
+        </div>
+        <div id="inventory-buttons">
+            <button id="regenerate-inventory-btn">Generate New Sword</button>
+            <button id="equip-btn">Equip Selected</button>
+            <button id="close-inventory-btn">Close</button>
+        </div>
+    </div>
+    
     <script type="module">
         import * as THREE from 'three';
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
@@ -266,34 +380,48 @@
         
         addRandomObjects();
         
+        // Sword inventory system
+        const swordInventory = [];
+        let currentSwordIndex = -1;
+        let selectedSwordIndex = -1;
+        
+        // UI elements
+        const instructionsElement = document.getElementById('instructions');
+        const inventoryContainer = document.getElementById('inventory-container');
+        const swordGridElement = document.getElementById('sword-grid');
+        const equipButton = document.getElementById('equip-btn');
+        const regenerateInventoryBtn = document.getElementById('regenerate-inventory-btn');
+        const closeInventoryBtn = document.getElementById('close-inventory-btn');
+        
+        // Menu state
+        let menuOpen = false;
+        
         // Controls setup
         const controls = new PointerLockControls(camera, document.body);
         
         document.addEventListener('click', function() {
-            controls.lock();
+            if (!menuOpen) {
+                controls.lock();
+            }
         });
         
         controls.addEventListener('lock', function() {
-            document.getElementById('instructions').style.opacity = '0.5';
+            instructionsElement.style.display = 'none';
+            inventoryContainer.style.display = 'none';
+            menuOpen = false;
         });
         
         controls.addEventListener('unlock', function() {
-            document.getElementById('instructions').style.opacity = '1';
+            // Don't automatically show instructions when unlocked
+            // Only show when ESC is pressed
         });
         
-        // Movement variables
-        const velocity = new THREE.Vector3();
-        const direction = new THREE.Vector3();
-        let moveForward = false;
-        let moveBackward = false;
-        let moveLeft = false;
-        let moveRight = false;
-        
-        // Handle key controls
-        document.addEventListener('keydown', onKeyDown);
-        document.addEventListener('keyup', onKeyUp);
-        
-        function onKeyDown(event) {
+        // Handle ESC key to show menu
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                handleEscapeKey();
+            }
+            
             switch(event.code) {
                 case 'ArrowUp':
                 case 'KeyW':
@@ -312,50 +440,60 @@
                     moveRight = true;
                     break;
             }
-        }
+        });
         
-        function onKeyUp(event) {
-            switch(event.code) {
-                case 'ArrowUp':
-                case 'KeyW':
-                    moveForward = false;
-                    break;
-                case 'ArrowLeft':
-                case 'KeyA':
-                    moveLeft = false;
-                    break;
-                case 'ArrowDown':
-                case 'KeyS':
-                    moveBackward = false;
-                    break;
-                case 'ArrowRight':
-                case 'KeyD':
-                    moveRight = false;
-                    break;
+        function handleEscapeKey() {
+            if (controls.isLocked) {
+                controls.unlock();
+                setTimeout(() => {
+                    instructionsElement.style.display = 'flex';
+                    menuOpen = true;
+                }, 100);
+            } else if (!inventoryContainer.style.display || inventoryContainer.style.display === 'none') {
+                instructionsElement.style.display = 'flex';
+                menuOpen = true;
             }
         }
         
-        // Modify the hand offset position and rotation for better visibility
-        let sword = null;
-        let handOffset = new THREE.Object3D();
-        camera.add(handOffset);
-        handOffset.position.set(0.5, -0.4, -1); // Moved down by adjusting Y from -0.2 to -0.4
+        // Show inventory UI
+        function showInventory() {
+            instructionsElement.style.display = 'none';
+            inventoryContainer.style.display = 'flex';
+            updateInventoryUI();
+        }
         
-        // Sword glow container (renamed from swordParticles)
-        const swordGlowEffects = new THREE.Group();
-        handOffset.add(swordGlowEffects);
+        // Handle regenerate button click - now adds to inventory
+        document.getElementById('regenerate-btn').addEventListener('click', function() {
+            showInventory();
+            generateNewSword();
+        });
         
-        // Swing animation state variables
-        let isSwinging = false;
-        let swingProgress = 0;
-        let swingDirection = 1; // 1 for forward swing, -1 for returning
-        const swingDuration = 0.25; // Faster swing
+        // Handle regenerate from inventory
+        regenerateInventoryBtn.addEventListener('click', function() {
+            generateNewSword();
+        });
         
-        // Generate sword using AI
-        generateSword();
+        // Handle equip button
+        equipButton.addEventListener('click', function() {
+            if (selectedSwordIndex >= 0 && selectedSwordIndex < swordInventory.length) {
+                equipSword(selectedSwordIndex);
+                closeInventory();
+            }
+        });
         
-        async function generateSword() {
+        // Handle close inventory button
+        closeInventoryBtn.addEventListener('click', closeInventory);
+        
+        function closeInventory() {
+            inventoryContainer.style.display = 'none';
+            instructionsElement.style.display = 'flex';
+        }
+        
+        // Generate sword using AI and add to inventory
+        async function generateNewSword() {
             try {
+                document.getElementById('loading').style.display = 'flex';
+                
                 const swordImage = await websim.imageGen({
                     prompt: "A vertical fantasy sword standing upright with blade pointing up and handle at bottom, ornate metal handle at the bottom and shiny enchanted blade extending upward with blue magical runes, centered on pure blue background, full sword visible in frame",
                     aspect_ratio: "1:1"
@@ -368,39 +506,25 @@
                 img.onload = function() {
                     const transparentSwordUrl = removeSwordBackground(img);
                     
-                    const swordTexture = new THREE.TextureLoader().load(transparentSwordUrl);
-                    swordTexture.flipY = false;
+                    // Add to inventory with original and processed URLs
+                    const swordData = {
+                        originalUrl: swordImage.url,
+                        processedUrl: transparentSwordUrl,
+                        name: `Sword ${swordInventory.length + 1}`,
+                        timestamp: Date.now()
+                    };
                     
-                    // Enhanced sword material with stronger emissive glow
-                    const swordMaterial = new THREE.MeshStandardMaterial({ 
-                        map: swordTexture,
-                        transparent: true,
-                        side: THREE.DoubleSide,
-                        alphaTest: 0.5,
-                        emissive: 0x4466ff,
-                        emissiveIntensity: 0, // Start with no glow
-                        metalness: 0.9,
-                        roughness: 0.1,
-                        envMapIntensity: 1.5
-                    });
+                    swordInventory.push(swordData);
+                    const newIndex = swordInventory.length - 1;
                     
-                    // Create a slightly thicker plane for better shadow casting
-                    const swordGeometry = new THREE.PlaneGeometry(1, 1);
-                    sword = new THREE.Mesh(swordGeometry, swordMaterial);
+                    // Update the inventory UI
+                    updateInventoryUI();
+                    selectSword(newIndex);
                     
-                    // Set up sword positioning - fixed rotation for correct leftward angle
-                    sword.rotation.y = Math.PI / 2; // Reverted to original rotation
-                    sword.rotation.z = -Math.PI / 8 - Math.PI / 6; // Added 30 degrees left tilt on Z axis
-                    sword.rotation.x = Math.PI / 6 + Math.PI; 
-                    
-                    // Enable shadow casting for the sword
-                    sword.castShadow = true;
-                    sword.receiveShadow = false;
-                    
-                    handOffset.add(sword);
-                    
-                    // Add sword glow effect without particles
-                    addSwordGlowEffect();
+                    // If this is the first sword, equip it immediately
+                    if (swordInventory.length === 1) {
+                        equipSword(0);
+                    }
                     
                     document.getElementById('loading').style.display = 'none';
                 }
@@ -410,22 +534,115 @@
             }
         }
         
-        // Function to create a glow effect around the sword without particles
-        function addSwordGlowEffect() {
-            // Add a subtle blue light at the sword's position
-            const swordPointLight = new THREE.PointLight(0x3366ff, 2, 2);
-            swordPointLight.position.set(0, 0, 0);
-            swordPointLight.visible = false; // Start with lights off
-            swordGlowEffects.add(swordPointLight);
+        // Update the inventory UI with sword items
+        function updateInventoryUI() {
+            swordGridElement.innerHTML = '';
             
-            // Add a second light for additional glow effect
-            const secondGlowLight = new THREE.PointLight(0x00aaff, 1.5, 1.5);
-            secondGlowLight.position.set(0, 0.2, 0);
-            secondGlowLight.visible = false; // Start with lights off
-            swordGlowEffects.add(secondGlowLight);
+            swordInventory.forEach((sword, index) => {
+                const swordItem = document.createElement('div');
+                swordItem.className = 'sword-item';
+                if (index === selectedSwordIndex) {
+                    swordItem.classList.add('selected');
+                }
+                
+                const swordImg = document.createElement('img');
+                swordImg.className = 'sword-preview';
+                swordImg.src = sword.processedUrl;
+                swordImg.alt = sword.name;
+                
+                const swordLabel = document.createElement('div');
+                swordLabel.className = 'sword-label';
+                swordLabel.textContent = sword.name;
+                
+                // Rename button
+                const renameBtn = document.createElement('button');
+                renameBtn.className = 'small-button';
+                renameBtn.textContent = 'Rename';
+                renameBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const newName = prompt('Enter new name for this sword:', sword.name);
+                    if (newName && newName.trim() !== '') {
+                        sword.name = newName.trim();
+                        updateInventoryUI();
+                    }
+                });
+                
+                swordItem.appendChild(swordImg);
+                swordItem.appendChild(swordLabel);
+                swordItem.appendChild(renameBtn);
+                
+                swordItem.addEventListener('click', () => {
+                    selectSword(index);
+                });
+                
+                swordGridElement.appendChild(swordItem);
+            });
         }
         
-        // Function to remove background from sword image - improved version
+        // Select a sword in the inventory
+        function selectSword(index) {
+            selectedSwordIndex = index;
+            updateInventoryUI();
+        }
+        
+        // Equip a sword from the inventory
+        function equipSword(index) {
+            if (index >= 0 && index < swordInventory.length) {
+                currentSwordIndex = index;
+                
+                // Remove existing sword and effects
+                if (sword) {
+                    handOffset.remove(sword);
+                    sword = null;
+                }
+                
+                // Clear existing glow effects
+                while (swordGlowEffects.children.length > 0) {
+                    swordGlowEffects.remove(swordGlowEffects.children[0]);
+                }
+                
+                // Reset swing state
+                isSwinging = false;
+                swingProgress = 0;
+                
+                // Create the sword with the selected texture
+                const swordTexture = new THREE.TextureLoader().load(swordInventory[index].processedUrl);
+                swordTexture.flipY = false;
+                
+                // Enhanced sword material with stronger emissive glow
+                const swordMaterial = new THREE.MeshStandardMaterial({ 
+                    map: swordTexture,
+                    transparent: true,
+                    side: THREE.DoubleSide,
+                    alphaTest: 0.5,
+                    emissive: 0x4466ff,
+                    emissiveIntensity: 0, // Start with no glow
+                    metalness: 0.9,
+                    roughness: 0.1,
+                    envMapIntensity: 1.5
+                });
+                
+                // Create a slightly thicker plane for better shadow casting
+                const swordGeometry = new THREE.PlaneGeometry(1, 1);
+                sword = new THREE.Mesh(swordGeometry, swordMaterial);
+                
+                // Set up sword positioning - fixed rotation for correct leftward angle
+                sword.rotation.y = Math.PI / 2; // Reverted to original rotation
+                sword.rotation.z = -Math.PI / 8 - Math.PI / 6; // Added 30 degrees left tilt on Z axis
+                sword.rotation.x = Math.PI / 6 + Math.PI; 
+                
+                // Enable shadow casting for the sword
+                sword.castShadow = true;
+                sword.receiveShadow = false;
+                
+                handOffset.add(sword);
+                
+                // Add sword glow effect without particles
+                addSwordGlowEffect();
+            }
+        }
+        
+        // Function to remove background from sword image
         function removeSwordBackground(img) {
             const canvas = document.createElement('canvas');
             canvas.width = img.width;
@@ -570,6 +787,67 @@
             return canvas.toDataURL();
         }
         
+        // Function to create a glow effect around the sword without particles
+        function addSwordGlowEffect() {
+            // Add a subtle blue light at the sword's position
+            const swordPointLight = new THREE.PointLight(0x3366ff, 2, 2);
+            swordPointLight.position.set(0, 0, 0);
+            swordPointLight.visible = false; // Start with lights off
+            swordGlowEffects.add(swordPointLight);
+            
+            // Add a second light for additional glow effect
+            const secondGlowLight = new THREE.PointLight(0x00aaff, 1.5, 1.5);
+            secondGlowLight.position.set(0, 0.2, 0);
+            secondGlowLight.visible = false; // Start with lights off
+            swordGlowEffects.add(secondGlowLight);
+        }
+        
+        // Movement variables
+        const velocity = new THREE.Vector3();
+        const direction = new THREE.Vector3();
+        let moveForward = false;
+        let moveBackward = false;
+        let moveLeft = false;
+        let moveRight = false;
+        
+        // Handle key controls
+        document.addEventListener('keyup', function(event) {
+            switch(event.code) {
+                case 'ArrowUp':
+                case 'KeyW':
+                    moveForward = false;
+                    break;
+                case 'ArrowLeft':
+                case 'KeyA':
+                    moveLeft = false;
+                    break;
+                case 'ArrowDown':
+                case 'KeyS':
+                    moveBackward = false;
+                    break;
+                case 'ArrowRight':
+                case 'KeyD':
+                    moveRight = false;
+                    break;
+            }
+        });
+        
+        // Modify the hand offset position and rotation for better visibility
+        let sword = null;
+        let handOffset = new THREE.Object3D();
+        camera.add(handOffset);
+        handOffset.position.set(0.5, -0.4, -1); // Moved down by adjusting Y from -0.2 to -0.4
+        
+        // Sword glow container
+        const swordGlowEffects = new THREE.Group();
+        handOffset.add(swordGlowEffects);
+        
+        // Swing animation state variables
+        let isSwinging = false;
+        let swingProgress = 0;
+        let swingDirection = 1; // 1 for forward swing, -1 for returning
+        const swingDuration = 0.25; // Faster swing
+        
         // Handle mouse click for sword swinging
         document.addEventListener('mousedown', function(event) {
             // Left mouse button (button 0)
@@ -591,34 +869,8 @@
             }
         });
         
-        // New function to handle sword regeneration
-        function regenerateSword() {
-            // Show loading screen
-            document.getElementById('loading').style.display = 'flex';
-            
-            // Remove existing sword and effects
-            if (sword) {
-                handOffset.remove(sword);
-                sword = null;
-            }
-            
-            // Clear existing glow effects
-            while (swordGlowEffects.children.length > 0) {
-                swordGlowEffects.remove(swordGlowEffects.children[0]);
-            }
-            
-            // Reset swing state
-            isSwinging = false;
-            swingProgress = 0;
-            
-            // Generate new sword
-            generateSword();
-        }
-        
-        // Add event listener to regenerate button
-        document.getElementById('regenerate-btn').addEventListener('click', function() {
-            regenerateSword();
-        });
+        // Generate first sword and start inventory
+        generateNewSword();
         
         // Animation loop
         const clock = new THREE.Clock();
