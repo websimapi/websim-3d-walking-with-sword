@@ -220,6 +220,30 @@ canvas {
     transform: scale(1.05);
 }
 
+#control-mode-selector {
+    margin: 20px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#control-mode-selector label {
+    margin-bottom: 8px;
+    font-size: 16px;
+    color: #ccc;
+}
+
+#control-mode {
+    padding: 10px 15px;
+    font-size: 16px;
+    border-radius: 5px;
+    background-color: #333;
+    color: white;
+    border: 1px solid #555;
+    width: 80%;
+    max-width: 250px;
+}
+
 #swing-button {
     width: 180px;
     height: 180px;
@@ -236,6 +260,7 @@ canvas {
     transition: all 0.2s;
     box-shadow: 0 0 30px rgba(68, 102, 255, 0.5);
     user-select: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 #swing-button:active {

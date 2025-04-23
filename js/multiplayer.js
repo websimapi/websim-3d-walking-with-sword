@@ -9,6 +9,16 @@ export const playerEntities = {};
 export let isDesktop = true;
 export let pairedClientId = null;
 
+// Control modes for mobile
+export const mobileControlModes = {
+    BUTTON: 'button',   // Simple button press to swing
+    MOTION: 'motion',   // Motion-based swing detection
+    POSITION: 'position' // Direct sword position control
+};
+
+// Current control mode
+export let currentMobileMode = mobileControlModes.MOTION;
+
 // Check if the device is mobile or desktop
 export function detectDeviceType() {
     const userAgent = navigator.userAgent || navigator.vendor || window.opera;
@@ -50,6 +60,7 @@ export async function initMultiplayer() {
             pairedWith: null,
             accelerometer: { x: 0, y: 0, z: 0 },
             gyroscope: { alpha: 0, beta: 0, gamma: 0 },
+            controlMode: currentMobileMode,
             username: room.peers[room.clientId]?.username || 'Unknown Player'
         };
     
@@ -356,10 +367,17 @@ function handleDeviceOrientation(event) {
     
     // Update our presence with the new gyroscope data
     if (room && pairedClientId) {
+        const swordRotation = calculateSwordRotationFromGyro(alpha, beta, gamma);
+        
         room.updatePresence({
             gyroscope: { alpha, beta, gamma },
-            swordRotation: calculateSwordRotationFromGyro(alpha, beta, gamma)
+            swordRotation: swordRotation
         });
+        
+        // In position control mode, we also rotate based on phone orientation
+        if (currentMobileMode === mobileControlModes.POSITION) {
+            // This will be processed by the desktop to update sword position
+        }
     }
 }
 
@@ -379,8 +397,11 @@ function handleDeviceMotion(event) {
             }
         });
         
-        // Detect sword swings based on acceleration
-        detectSwordSwing(accel);
+        // Only detect swings in MOTION mode
+        if (currentMobileMode === mobileControlModes.MOTION) {
+            // Detect sword swings based on acceleration
+            detectSwordSwing(accel);
+        }
     }
 }
 
@@ -402,19 +423,25 @@ function detectSwordSwing(accel) {
     if (deltaX + deltaY + deltaZ > swingThreshold) {
         console.log('Sword swing detected!');
         
+        // Calculate intensity for vibration and effects
+        const intensity = deltaX + deltaY + deltaZ;
+        
+        // Vibrate the device based on swing intensity
+        vibrateDevice(intensity);
+        
         // Send a message to all clients about the sword swing
         room.send({
             type: 'swordSwing',
             clientId: room.clientId,
             username: room.peers[room.clientId]?.username || 'Unknown Player',
-            intensity: deltaX + deltaY + deltaZ
+            intensity: intensity
         });
         
         // Notify the paired desktop client to swing their sword
         if (pairedClientId) {
             room.requestPresenceUpdate(pairedClientId, {
                 type: 'swordSwingTrigger',
-                intensity: deltaX + deltaY + deltaZ
+                intensity: intensity
             });
         }
         
@@ -450,8 +477,31 @@ function calculateSwordRotationFromGyro(alpha, beta, gamma) {
 function applySwordOrientationFromMobile(mobileData) {
     if (!sword) return;
     
-    // Only apply if we're not in the middle of a programmatic swing
-    if (!window.swingState?.isSwinging) {
+    // Get the mobile control mode
+    const controlMode = mobileData.controlMode || mobileControlModes.MOTION;
+    
+    // In position mode, we directly control the sword position with phone orientation
+    // Regardless of swing state
+    if (controlMode === mobileControlModes.POSITION) {
+        // Get the gyroscope-based sword rotation
+        const rotationData = mobileData.swordRotation;
+        if (rotationData) {
+            // Apply it to the sword with more responsive (less dampened) control
+            const dampingFactor = 0.2; // Higher = more responsive to changes
+            
+            // Adjust the base rotations to account for the sword's initial position
+            const targetRotX = Math.PI / 6 + Math.PI + rotationData.x * 0.7;
+            const targetRotY = Math.PI / 2 + rotationData.z * 0.7;
+            const targetRotZ = -Math.PI / 8 - Math.PI / 6 + rotationData.y * 0.7;
+            
+            // Apply damping
+            sword.rotation.x += (targetRotX - sword.rotation.x) * dampingFactor;
+            sword.rotation.y += (targetRotY - sword.rotation.y) * dampingFactor;
+            sword.rotation.z += (targetRotZ - sword.rotation.z) * dampingFactor;
+        }
+    } 
+    // In other modes, only apply orientation when not swinging
+    else if (!window.swingState?.isSwinging) {
         // Get the gyroscope-based sword rotation
         const rotationData = mobileData.swordRotation;
         if (rotationData) {
@@ -565,6 +615,33 @@ function playRemoteSwordSwingEffect(clientId) {
     animateSwing();
 }
 
+// Vibrate the mobile device
+function vibrateDevice(intensity) {
+    // Check if vibration API is supported
+    if (!navigator.vibrate) {
+        console.log('Vibration API not supported');
+        return;
+    }
+    
+    // Scale intensity to a reasonable vibration duration (50-300ms)
+    const baseDuration = 100;
+    let vibrationDuration = Math.min(300, Math.max(50, baseDuration + intensity * 2));
+    
+    // For stronger swings, use a pattern
+    if (intensity > 25) {
+        // Strong swing: vibrate-pause-vibrate pattern
+        navigator.vibrate([vibrationDuration, 50, vibrationDuration * 0.7]);
+    } else if (intensity > 20) {
+        // Medium swing: simple pattern
+        navigator.vibrate([vibrationDuration, 30, vibrationDuration * 0.5]);
+    } else {
+        // Regular swing: single vibration
+        navigator.vibrate(vibrationDuration);
+    }
+    
+    console.log(`Vibrating for ${vibrationDuration}ms with intensity ${intensity}`);
+}
+
 // Create mobile UI
 function createMobileUI() {
     const mobileUIContainer = document.createElement('div');
@@ -575,6 +652,14 @@ function createMobileUI() {
             <p id="pairing-status">Looking for a player to connect to...</p>
             <button id="request-sensor-permission" style="display: none;">Enable Gyroscope & Accelerometer</button>
             <button id="pair-button">Find Player</button>
+            <div id="control-mode-selector">
+                <label>Control Mode:</label>
+                <select id="control-mode">
+                    <option value="${mobileControlModes.MOTION}">Motion Swing</option>
+                    <option value="${mobileControlModes.BUTTON}">Button Swing</option>
+                    <option value="${mobileControlModes.POSITION}">Position Control</option>
+                </select>
+            </div>
             <div id="swing-button">SWING</div>
         </div>
     `;
@@ -585,6 +670,28 @@ function createMobileUI() {
     document.getElementById('request-sensor-permission').addEventListener('click', requestSensorPermission);
     document.getElementById('pair-button').addEventListener('click', findDesktopToPair);
     document.getElementById('swing-button').addEventListener('touchstart', triggerManualSwordSwing);
+    
+    // Control mode selector
+    const controlModeSelect = document.getElementById('control-mode');
+    controlModeSelect.addEventListener('change', function() {
+        currentMobileMode = this.value;
+        console.log(`Switched to control mode: ${currentMobileMode}`);
+        
+        // Update presence with new control mode
+        if (room) {
+            room.updatePresence({
+                controlMode: currentMobileMode
+            });
+        }
+        
+        // Show/hide swing button based on mode
+        const swingButton = document.getElementById('swing-button');
+        if (currentMobileMode === mobileControlModes.POSITION) {
+            swingButton.style.display = 'none';
+        } else {
+            swingButton.style.display = 'flex';
+        }
+    });
 }
 
 // Request permission for sensors on iOS
@@ -605,6 +712,9 @@ async function requestSensorPermission() {
 // Trigger manual sword swing (for mobile devices without working accelerometer)
 function triggerManualSwordSwing() {
     if (!room || !pairedClientId) return;
+    
+    // Vibrate the device
+    vibrateDevice(20); // Medium intensity for button press
     
     // Send a sword swing message
     room.send({
