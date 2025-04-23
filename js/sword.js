@@ -12,6 +12,11 @@ export let arm = null;
 export let armImage = null;
 export let isArmShowing = false;
 
+// Arm inventory
+export const armInventory = [];
+export let currentArmIndex = 0;
+export let selectedArmIndex = 0;
+
 // Sword inventory
 export const swordInventory = [];
 export let currentSwordIndex = -1;
@@ -45,6 +50,7 @@ export function initSword(camera) {
 export async function generateNewSword() {
     try {
         document.getElementById('loading').style.display = 'flex';
+        document.getElementById('loading').querySelector('h2').textContent = "Generating your sword...";
         
         // Enhanced detailed prompt for better background removal
         const swordImage = await websim.imageGen({
@@ -101,6 +107,75 @@ The sword must appear as if it was photographed against a perfectly flat blue sc
     } catch (error) {
         console.error("Error generating sword:", error);
         document.getElementById('loading').innerHTML = 'Error generating sword. Refresh to try again.';
+    }
+}
+
+export async function generateNewArm() {
+    try {
+        document.getElementById('loading').style.display = 'flex';
+        document.getElementById('loading').querySelector('h2').textContent = "Generating your arm...";
+        
+        const armImageResult = await websim.imageGen({
+            prompt: `Create a high-contrast first-person view of a right arm and fist with these EXACT specifications:
+
+- BACKGROUND: Perfect solid #0000FF blue background (RGB 0,0,255) with absolutely NO gradients, NO texture, NO shading, and NO variations
+- POSITIONING: Arm extends from bottom right of frame toward center, in a natural first-person perspective
+- COMPOSITION: Full fist and partial forearm visible, as if viewed by the person themselves
+- ARM DETAILS: 
+  * Realistic human arm with slightly tanned skin tone
+  * Fist clenched but not aggressive, in a natural resting position
+  * Clear definition of knuckles and muscle tone
+  * High contrast between arm and background
+  * Clear, defined edges with no blur between arm and background
+- LIGHTING: Even lighting with minimal shadows
+- STYLE: Clean, detailed render with crisp edges
+- ISOLATION: Absolutely NO elements besides the arm/fist and solid blue background
+
+The arm must appear as if it was photographed against a perfectly flat blue screen with sharp delineation between arm and background.`,
+            aspect_ratio: "1:1"
+        });
+
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.src = armImageResult.url;
+        
+        img.onload = function() {
+            const transparentArmUrl = removeSwordBackground(img);
+            
+            // Add to arm inventory
+            const armData = {
+                originalUrl: armImageResult.url,
+                processedUrl: transparentArmUrl,
+                name: `Arm ${armInventory.length + 1}`,
+                timestamp: Date.now()
+            };
+            
+            armInventory.push(armData);
+            const newIndex = armInventory.length - 1;
+            
+            // Update the arm image reference
+            armImage = transparentArmUrl;
+            setSelectedArmIndex(newIndex);
+            currentArmIndex = newIndex;
+            
+            // Create arm mesh with the new image
+            createArmMesh();
+            
+            // Update the inventory UI
+            import('./inventory.js').then(module => {
+                module.updateInventoryUI();
+                
+                document.getElementById('loading').style.display = 'none';
+                
+                // Show arm if no sword is equipped
+                if (sword === null) {
+                    showArm();
+                }
+            });
+        }
+    } catch (error) {
+        console.error("Error generating arm:", error);
+        document.getElementById('loading').innerHTML = 'Error generating arm. Refresh to try again.';
     }
 }
 
@@ -189,7 +264,7 @@ export function showArm() {
         isArmShowing = true;
     } else if (!arm && armImage) {
         createArmMesh();
-    } else if (!armImage) {
+    } else if (armInventory.length === 0) {
         generateArmImage();
     }
 }
@@ -204,27 +279,25 @@ export function hideArm() {
 export async function generateArmImage() {
     try {
         document.getElementById('loading').style.display = 'flex';
-        document.getElementById('loading').querySelector('h2').textContent = "Generating your armored gauntlet...";
+        document.getElementById('loading').querySelector('h2').textContent = "Generating your arm...";
         
         const armImageResult = await websim.imageGen({
-            prompt: `[CRITICAL: IMAGE MUST HAVE 100% PURE SOLID BLUE BACKGROUND #0000FF]
+            prompt: `Create a high-contrast first-person view of a right arm and fist with these EXACT specifications:
 
-Create a simple medieval armored right hand/gauntlet with these specifications:
-
-- BACKGROUND: Perfect solid #0000FF blue background with NO variations or textures
-- POSITIONING: Right arm extends from bottom right corner of the frame toward center, first-person view
-- HAND POSITION: Gauntlet in open position with fingers slightly curled as if ready to grasp a sword
-- COMPOSITION: Hand and partial forearm only, viewed as if looking at your own hand
+- BACKGROUND: Perfect solid #0000FF blue background (RGB 0,0,255) with absolutely NO gradients, NO texture, NO shading, and NO variations
+- POSITIONING: Arm extends from bottom right of frame toward center, in a natural first-person perspective
+- COMPOSITION: Full fist and partial forearm visible, as if viewed by the person themselves
 - ARM DETAILS: 
-  * Simple medieval metal armor/gauntlet
-  * Silver/steel coloring
+  * Realistic human arm with slightly tanned skin tone
+  * Fist clenched but not aggressive, in a natural resting position
+  * Clear definition of knuckles and muscle tone
   * High contrast between arm and background
-  * Clear, sharp edges between the arm and blue background
-- STYLE: Clear, straightforward design with good definition
+  * Clear, defined edges with no blur between arm and background
+- LIGHTING: Even lighting with minimal shadows
+- STYLE: Clean, detailed render with crisp edges
+- ISOLATION: Absolutely NO elements besides the arm/fist and solid blue background
 
-The image must have a perfectly solid blue background for automatic removal.
-
-[CRITICAL: BACKGROUND MUST BE SOLID BLUE #0000FF ONLY]`,
+The arm must appear as if it was photographed against a perfectly flat blue screen with sharp delineation between arm and background.`,
             aspect_ratio: "1:1"
         });
 
@@ -234,6 +307,19 @@ The image must have a perfectly solid blue background for automatic removal.
         
         img.onload = function() {
             const transparentArmUrl = removeSwordBackground(img);
+            
+            // Add to arm inventory
+            const armData = {
+                originalUrl: armImageResult.url,
+                processedUrl: transparentArmUrl,
+                name: `Arm ${armInventory.length + 1}`,
+                timestamp: Date.now()
+            };
+            
+            armInventory.push(armData);
+            currentArmIndex = 0;
+            selectedArmIndex = 0;
+            
             armImage = transparentArmUrl;
             createArmMesh();
             document.getElementById('loading').style.display = 'none';
@@ -246,6 +332,21 @@ The image must have a perfectly solid blue background for automatic removal.
     } catch (error) {
         console.error("Error generating arm:", error);
         document.getElementById('loading').innerHTML = 'Error generating arm. Refresh to try again.';
+    }
+}
+
+export function equipArm(index) {
+    if (index >= 0 && index < armInventory.length) {
+        currentArmIndex = index;
+        armImage = armInventory[index].processedUrl;
+        
+        // Recreate arm mesh with the new texture
+        createArmMesh();
+        
+        // Show arm if no sword is equipped
+        if (sword === null && !isArmShowing) {
+            showArm();
+        }
     }
 }
 
@@ -323,7 +424,11 @@ function addSwordGlowEffect() {
     swordGlowEffects.add(secondGlowLight);
 }
 
-// Add this setter function to properly update the selectedSwordIndex
+// Add setter functions
 export function setSelectedSwordIndex(index) {
     selectedSwordIndex = index;
+}
+
+export function setSelectedArmIndex(index) {
+    selectedArmIndex = index;
 }

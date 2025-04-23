@@ -74,15 +74,25 @@ canvas {
     border-bottom: 1px solid #444;
     padding-bottom: 10px;
 }
-#sword-grid {
+.inventory-section {
+    margin-bottom: 20px;
+}
+.inventory-section-title {
+    font-size: 18px;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #333;
+}
+#sword-grid, #arm-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     gap: 15px;
     overflow-y: auto;
-    max-height: 60vh;
+    max-height: 30vh;
     padding: 10px;
+    margin-bottom: 15px;
 }
-.sword-item {
+.sword-item, .arm-item {
     background: rgba(30, 30, 40, 0.8);
     border-radius: 5px;
     padding: 5px;
@@ -93,21 +103,21 @@ canvas {
     transition: all 0.2s;
     border: 2px solid transparent;
 }
-.sword-item:hover {
+.sword-item:hover, .arm-item:hover {
     background: rgba(50, 50, 70, 0.8);
 }
-.sword-item.selected {
+.sword-item.selected, .arm-item.selected {
     border-color: #4466ff;
     box-shadow: 0 0 10px #4466ff;
 }
-.sword-preview {
+.sword-preview, .arm-preview {
     width: 100px;
     height: 100px;
     object-fit: contain;
     background: rgba(0, 0, 0, 0.3);
     border-radius: 3px;
 }
-.sword-label {
+.sword-label, .arm-label {
     margin-top: 5px;
     font-size: 12px;
     text-align: center;
