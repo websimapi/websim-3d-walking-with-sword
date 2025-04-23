@@ -118,7 +118,7 @@ export async function generateNewArm() {
         const armImageResult = await websim.imageGen({
             prompt: `Create a high-contrast first-person view of a right arm and fist with these EXACT specifications:
 
-- BACKGROUND: Perfect solid #0000FF blue background (RGB 0,0,255) with absolutely NO gradients, NO texture, NO shading, and NO variations
+- BACKGROUND: Perfect solid #FFFFFF white background (RGB 255,255,255) with absolutely NO gradients, NO texture, NO shading, and NO variations
 - POSITIONING: Arm extends from bottom right of frame toward center, in a natural first-person perspective
 - COMPOSITION: Full fist and partial forearm visible, as if viewed by the person themselves
 - ARM DETAILS: 
@@ -129,9 +129,9 @@ export async function generateNewArm() {
   * Clear, defined edges with no blur between arm and background
 - LIGHTING: Even lighting with minimal shadows
 - STYLE: Clean, detailed render with crisp edges
-- ISOLATION: Absolutely NO elements besides the arm/fist and solid blue background
+- ISOLATION: Absolutely NO elements besides the arm/fist and solid white background
 
-The arm must appear as if it was photographed against a perfectly flat blue screen with sharp delineation between arm and background.`,
+The arm must appear as if it was photographed against a perfectly flat white screen with sharp delineation between arm and background.`,
             aspect_ratio: "1:1"
         });
 
@@ -284,7 +284,7 @@ export async function generateArmImage() {
         const armImageResult = await websim.imageGen({
             prompt: `Create a high-contrast first-person view of a right arm and fist with these EXACT specifications:
 
-- BACKGROUND: Perfect solid #0000FF blue background (RGB 0,0,255) with absolutely NO gradients, NO texture, NO shading, and NO variations
+- BACKGROUND: Perfect solid #FFFFFF white background (RGB 255,255,255) with absolutely NO gradients, NO texture, NO shading, and NO variations
 - POSITIONING: Arm extends from bottom right of frame toward center, in a natural first-person perspective
 - COMPOSITION: Full fist and partial forearm visible, as if viewed by the person themselves
 - ARM DETAILS: 
@@ -295,9 +295,9 @@ export async function generateArmImage() {
   * Clear, defined edges with no blur between arm and background
 - LIGHTING: Even lighting with minimal shadows
 - STYLE: Clean, detailed render with crisp edges
-- ISOLATION: Absolutely NO elements besides the arm/fist and solid blue background
+- ISOLATION: Absolutely NO elements besides the arm/fist and solid white background
 
-The arm must appear as if it was photographed against a perfectly flat blue screen with sharp delineation between arm and background.`,
+The arm must appear as if it was photographed against a perfectly flat white screen with sharp delineation between arm and background.`,
             aspect_ratio: "1:1"
         });
 
