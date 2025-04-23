@@ -155,6 +155,9 @@ export function handleSwordSwing() {
             sword.material.emissive = new THREE.Color(0x4466ff);
             sword.material.emissiveIntensity = 0.8;
         }
+        
+        // Play sword swing sound
+        playSwingSound();
     }
 }
 
@@ -171,6 +174,31 @@ function addSwordGlowEffect() {
     secondGlowLight.position.set(0, 0.2, 0);
     secondGlowLight.visible = false; // Start with lights off
     swordGlowEffects.add(secondGlowLight);
+}
+
+// Add a sound effect for sword swings
+function playSwingSound() {
+    // Create a simple synth sound for the sword swing
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // Create an oscillator
+    const oscillator = audioContext.createOscillator();
+    oscillator.type = 'triangle';
+    oscillator.frequency.setValueAtTime(440, audioContext.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(880, audioContext.currentTime + 0.1);
+    
+    // Create a gain node for volume control
+    const gainNode = audioContext.createGain();
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+    
+    // Connect the nodes
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    // Start and stop the sound
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.3);
 }
 
 // Add this setter function to properly update the selectedSwordIndex

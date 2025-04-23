@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { composer, scene, camera } from './sceneSetup.js';
 import { controls, movementState } from './controls.js';
 import { sword, handOffset, swordGlowEffects, swingState } from './sword.js';
+import { updatePhysics } from './physics.js';
 
 // Animation clock
 const clock = new THREE.Clock();
@@ -21,6 +22,9 @@ function animate() {
     
     // Handle sword animation
     updateSwordAnimation(delta);
+    
+    // Update physics simulation
+    updatePhysics(delta);
     
     // Use composer instead of renderer
     composer.render();
