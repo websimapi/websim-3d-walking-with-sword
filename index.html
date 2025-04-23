@@ -162,7 +162,7 @@
         let sword = null;
         let handOffset = new THREE.Object3D();
         camera.add(handOffset);
-        handOffset.position.set(0.5, -0.6, -1); 
+        handOffset.position.set(0.5, -0.4, -1); 
         
         // Generate sword using AI
         generateSword();
@@ -196,7 +196,7 @@
                     
                     sword.rotation.y = Math.PI / 2;
                     sword.rotation.z = -Math.PI / 8;
-                    sword.rotation.x = Math.PI / 6; // This rotates it 30 degrees to the left
+                    sword.rotation.x = Math.PI / 6 + Math.PI; 
                     
                     handOffset.add(sword);
                     
@@ -269,7 +269,7 @@
             
             if (sword) {
                 sword.rotation.z = -Math.PI / 8 + Math.sin(clock.elapsedTime * 2) * 0.05;
-                sword.rotation.x = Math.PI / 6;
+                sword.rotation.x = Math.PI / 6 + Math.PI; 
             }
             
             renderer.render(scene, camera);
