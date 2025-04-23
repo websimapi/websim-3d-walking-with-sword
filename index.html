@@ -315,7 +315,7 @@
         let sword = null;
         let handOffset = new THREE.Object3D();
         camera.add(handOffset);
-        handOffset.position.set(0.5, -0.2, -1); // Moved up a bit more
+        handOffset.position.set(0.5, -0.4, -1); // Moved down by adjusting Y from -0.2 to -0.4
         
         // Sword glow container (renamed from swordParticles)
         const swordGlowEffects = new THREE.Group();
@@ -365,7 +365,7 @@
                     sword = new THREE.Mesh(swordGeometry, swordMaterial);
                     
                     // Set up sword positioning
-                    sword.rotation.y = Math.PI / 2;
+                    sword.rotation.y = Math.PI / 2 + Math.PI / 6; // Added 30 degrees (Math.PI/6) to the left
                     sword.rotation.z = -Math.PI / 8;
                     sword.rotation.x = Math.PI / 6 + Math.PI; 
                     
@@ -620,6 +620,7 @@
                     // Base rotation values
                     const baseRotZ = -Math.PI / 8;
                     const baseRotX = Math.PI / 6 + Math.PI;
+                    const baseRotY = Math.PI / 2 + Math.PI / 6; // Updated to match the new base rotation
                     
                     // Swing animation curve (ease in-out)
                     const curve = swingDirection === 1 ? 
@@ -629,6 +630,7 @@
                     // Apply swing animation 
                     sword.rotation.z = baseRotZ - curve * 1.5; 
                     sword.rotation.x = baseRotX + curve * 1.0; 
+                    sword.rotation.y = baseRotY;
                     
                     // Animate glow intensity based on swing
                     if (sword.material) {
@@ -647,6 +649,7 @@
                     }
                 } else {
                     // Idle sword animation 
+                    sword.rotation.y = Math.PI / 2 + Math.PI / 6; // Maintain the 30-degree left angle during idle
                     sword.rotation.z = -Math.PI / 8 + Math.sin(clock.elapsedTime * 2) * 0.05;
                     sword.rotation.x = Math.PI / 6 + Math.PI + Math.sin(clock.elapsedTime * 1.5) * 0.03;
                     
