@@ -4,7 +4,8 @@ import {
     sword, 
     handOffset, 
     swordGlowEffects, 
-    isSwinging, 
+    isSwinging,
+    swingProgress, 
     addSwordGlowEffect, 
     removeSwordBackground 
 } from './sword.js';
@@ -132,7 +133,7 @@ export function equipSword(index) {
         
         // Reset swing state
         isSwinging = false;
-        let swingProgress = 0;
+        swingProgress = 0;
         
         // Create the sword with the selected texture
         const swordTexture = new THREE.TextureLoader().load(swordInventory[index].processedUrl);
