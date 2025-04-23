@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { composer, scene, camera } from './sceneSetup.js';
-import { controls, movementState, updateMultiplayerPosition } from './controls.js';
+import { controls, movementState } from './controls.js';
 import { sword, handOffset, swordGlowEffects, swingState } from './sword.js';
-import { playerEntities } from './multiplayer.js';
+import { updatePlayerPosition } from './multiplayer.js';
 
 // Animation clock
 const clock = new THREE.Clock();
+let lastUpdateTime = 0;
 
 export function setupAnimationLoop() {
     animate();
@@ -16,6 +17,7 @@ function animate() {
     requestAnimationFrame(animate);
     
     const delta = clock.getDelta();
+    const elapsedTime = clock.getElapsedTime();
     
     // Movement code
     updateMovement(delta);
@@ -23,8 +25,11 @@ function animate() {
     // Handle sword animation
     updateSwordAnimation(delta);
     
-    // Update billboarded elements (like nametags)
-    updateBillboards();
+    // Update player position for multiplayer at a reasonable rate (5 times per second)
+    if (elapsedTime - lastUpdateTime > 0.2) {
+        updatePlayerPosition();
+        lastUpdateTime = elapsedTime;
+    }
     
     // Use composer instead of renderer
     composer.render();
@@ -45,9 +50,6 @@ function updateMovement(delta) {
     
     controls.moveRight(-movementState.velocity.x * delta);
     controls.moveForward(-movementState.velocity.z * delta);
-    
-    // Update multiplayer position after movement
-    updateMultiplayerPosition();
 }
 
 function updateSwordAnimation(delta) {
@@ -118,22 +120,6 @@ function updateSwordAnimation(delta) {
         if (sword && sword.material) {
             sword.material.emissiveIntensity = 0;
         }
-    }
-}
-
-// Make billboarded elements face the camera
-function updateBillboards() {
-    // Make player nametags face the camera
-    for (const clientId in playerEntities) {
-        const playerMesh = playerEntities[clientId];
-        
-        // Look through children for billboarded elements
-        playerMesh.children.forEach(child => {
-            if (child.userData.isBillboard) {
-                // Make the child face the camera
-                child.lookAt(camera.position);
-            }
-        });
     }
 }
 

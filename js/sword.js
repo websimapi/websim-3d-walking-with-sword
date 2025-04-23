@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { scene, camera } from './sceneSetup.js';
 import { removeSwordBackground } from './utils.js';
-import { room, isDesktop } from './multiplayer.js';
+import { updatePlayerSword } from './multiplayer.js';
 
 // Sword and hand positioning
 export let handOffset = new THREE.Object3D();
@@ -36,12 +36,6 @@ export function initSword(camera) {
             generateNewSword();
         });
     });
-    
-    // Add listener for remote sword swing requests
-    if (room) {
-        // This has been moved to pairingSystem.js, and the functionality will be called from there
-        // TOMBSTONE: removed room.subscribePresenceUpdateRequests for sword swing triggers
-    }
 }
 
 export async function generateNewSword() {
@@ -160,31 +154,16 @@ export function equipSword(index) {
         // Add sword glow effect
         addSwordGlowEffect();
         
-        // Update multiplayer state to show the equipped sword
-        if (room && isDesktop) {
-            room.updatePresence({
-                equippedSword: {
-                    index: index,
-                    name: swordInventory[index].name
-                }
-            });
-        }
+        // Update multiplayer state with equipped sword
+        updatePlayerSword(index);
     }
 }
 
-export function handleSwordSwing(intensity = 1) {
+export function handleSwordSwing() {
     if (!swingState.isSwinging) {
         swingState.isSwinging = true;
         swingState.swingProgress = 0;
         swingState.swingDirection = 1; // Start with forward swing
-        
-        // Adjust swing duration based on intensity (if provided by mobile device)
-        if (intensity > 1) {
-            // Faster swing for stronger intensity (but not too fast)
-            swingState.swingDuration = Math.max(0.15, 0.25 - (intensity * 0.005));
-        } else {
-            swingState.swingDuration = 0.25; // Default duration
-        }
         
         // Enable sword glow effects during swing
         swordGlowEffects.children.forEach(light => {
@@ -195,16 +174,6 @@ export function handleSwordSwing(intensity = 1) {
         if (sword && sword.material) {
             sword.material.emissive = new THREE.Color(0x4466ff);
             sword.material.emissiveIntensity = 0.8;
-        }
-        
-        // Send sword swing message to other players if this wasn't triggered by a mobile device
-        if (room && isDesktop) {
-            room.send({
-                type: 'swordSwing',
-                clientId: room.clientId,
-                username: room.peers[room.clientId]?.username || 'Unknown Player',
-                intensity: intensity
-            });
         }
     }
 }
