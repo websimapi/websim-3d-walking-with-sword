@@ -213,6 +213,8 @@
         
         // Modify the hand offset position and rotation for better visibility
         let sword = null;
+        let swordBack = null;
+        let swordGroup = null;
         let handOffset = new THREE.Object3D();
         camera.add(handOffset);
         handOffset.position.set(0.5, -0.4, -1); 
@@ -237,6 +239,10 @@
                     const swordTexture = new THREE.TextureLoader().load(transparentSwordUrl);
                     swordTexture.flipY = false;
                     
+                    // Create a group for the sword parts
+                    swordGroup = new THREE.Group();
+                    handOffset.add(swordGroup);
+                    
                     // Use MeshStandardMaterial instead of MeshBasicMaterial for light interaction
                     const swordMaterial = new THREE.MeshStandardMaterial({ 
                         map: swordTexture,
@@ -251,8 +257,6 @@
                     sword = new THREE.Mesh(swordGeometry, swordMaterial);
                     
                     sword.rotation.y = Math.PI / 2;
-                    sword.rotation.z = -Math.PI / 8;
-                    sword.rotation.x = Math.PI / 6 + Math.PI; 
                     sword.castShadow = true; // Enable sword shadow
                     
                     // Add a second plane with slight offset to give the sword more volume
@@ -266,20 +270,23 @@
                         metalness: 0.7
                     });
                     
-                    const swordBack = new THREE.Mesh(swordBackGeometry, swordBackMaterial);
+                    swordBack = new THREE.Mesh(swordBackGeometry, swordBackMaterial);
                     swordBack.position.z = -0.01;
                     swordBack.rotation.y = Math.PI / 2;
-                    swordBack.rotation.z = -Math.PI / 8;
-                    swordBack.rotation.x = Math.PI / 6 + Math.PI;
                     swordBack.castShadow = true;
+                    
+                    // Add the sword parts to the group instead of directly to handOffset
+                    swordGroup.add(sword);
+                    swordGroup.add(swordBack);
+                    
+                    // Set initial rotation of the group
+                    swordGroup.rotation.z = -Math.PI / 8;
+                    swordGroup.rotation.x = Math.PI / 6 + Math.PI;
                     
                     // Create a glow effect for the sword
                     const swordGlow = new THREE.PointLight(0x6688ff, 1, 2);
                     swordGlow.position.set(0, 0, 0);
-                    
-                    handOffset.add(sword);
-                    handOffset.add(swordBack);
-                    handOffset.add(swordGlow);
+                    swordGroup.add(swordGlow);
                     
                     document.getElementById('loading').style.display = 'none';
                     
@@ -352,23 +359,18 @@
             controls.moveRight(-velocity.x * delta);
             controls.moveForward(-velocity.z * delta);
             
-            if (sword) {
-                // Add subtle sword animation
-                sword.rotation.z = -Math.PI / 8 + Math.sin(clock.elapsedTime * 2) * 0.05;
-                sword.rotation.x = Math.PI / 6 + Math.PI + Math.sin(clock.elapsedTime) * 0.02; 
+            if (swordGroup) {
+                // Animate the whole sword group instead of just the sword
+                swordGroup.rotation.z = -Math.PI / 8 + Math.sin(clock.elapsedTime * 2) * 0.05;
+                swordGroup.rotation.x = Math.PI / 6 + Math.PI + Math.sin(clock.elapsedTime) * 0.02; 
                 
                 // Cast rays from the sword to calculate shadow projection
-                // This is for visual effects only
                 if (clock.elapsedTime % 0.5 < 0.1) { // Only do this check occasionally for performance
                     const swordWorldPosition = new THREE.Vector3();
-                    sword.getWorldPosition(swordWorldPosition);
+                    swordGroup.getWorldPosition(swordWorldPosition);
                     
                     raycaster.set(swordWorldPosition, rayDirection);
                     const intersects = raycaster.intersectObject(plane);
-                    
-                    if (intersects.length > 0) {
-                        // Here we could add additional shadow effects if needed
-                    }
                 }
             }
             
