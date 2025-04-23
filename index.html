@@ -57,9 +57,10 @@
         import { PMREMGenerator } from 'three';
         import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-        import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
         import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+        import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+        import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 
         // Scene setup
         const scene = new THREE.Scene();
@@ -81,31 +82,32 @@
         renderer.physicallyCorrectLights = true;
         renderer.outputEncoding = THREE.sRGBEncoding;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.0;
+        renderer.toneMappingExposure = 1.2;
         
         // Improved shadow settings
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.shadowMap.autoUpdate = true;
         document.body.appendChild(renderer.domElement);
         
-        // Post-processing setup
+        // Post-processing setup with focus on high-quality shadows
         const composer = new EffectComposer(renderer);
         const renderPass = new RenderPass(scene, camera);
         composer.addPass(renderPass);
         
-        // Ambient Occlusion
-        const ssaoPass = new SSAOPass(scene, camera, window.innerWidth, window.innerHeight);
-        ssaoPass.kernelRadius = 16;
-        ssaoPass.minDistance = 0.005;
-        ssaoPass.maxDistance = 0.1;
-        composer.addPass(ssaoPass);
+        // FXAA for anti-aliasing (better quality than the blurry SSAO pass)
+        const fxaaPass = new ShaderPass(FXAAShader);
+        const pixelRatio = renderer.getPixelRatio();
+        fxaaPass.material.uniforms['resolution'].value.x = 1 / (window.innerWidth * pixelRatio);
+        fxaaPass.material.uniforms['resolution'].value.y = 1 / (window.innerHeight * pixelRatio);
+        composer.addPass(fxaaPass);
         
-        // Bloom effect for light glow
+        // Selective bloom effect for the sword
         const bloomPass = new UnrealBloomPass(
             new THREE.Vector2(window.innerWidth, window.innerHeight),
-            0.2,  // strength
-            0.1,  // radius
-            0.9   // threshold
+            0.8,  // strength - increased for better sword visibility
+            0.3,  // radius - increased slightly for softer glow
+            0.4   // threshold - lowered to make more of the sword glow
         );
         composer.addPass(bloomPass);
         
@@ -127,36 +129,47 @@
                 pmremGenerator.dispose();
             });
         
-        // Enhanced lighting setup
-        const ambientLight = new THREE.AmbientLight(0x404040, 0.3);
+        // Enhanced lighting setup for better shadows
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.2); // Slightly dimmer ambient
         scene.add(ambientLight);
         
         // Hemisphere light for sky/ground illumination
-        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.5);
         hemiLight.position.set(0, 20, 0);
         scene.add(hemiLight);
         
-        // Main directional light (sun)
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
-        directionalLight.position.set(-5, 12, 8);
+        // Main directional light (sun) - improved for better shadows
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        directionalLight.position.set(-5, 15, 8);
         directionalLight.castShadow = true;
         
-        // Improved shadow map settings
+        // Higher resolution shadow map for sharper shadows
         directionalLight.shadow.camera.near = 0.5;
         directionalLight.shadow.camera.far = 50;
         directionalLight.shadow.camera.left = -20;
         directionalLight.shadow.camera.right = 20;
         directionalLight.shadow.camera.top = 20;
         directionalLight.shadow.camera.bottom = -20;
-        directionalLight.shadow.bias = -0.0005;
-        directionalLight.shadow.mapSize.width = 2048;
-        directionalLight.shadow.mapSize.height = 2048;
+        directionalLight.shadow.bias = -0.0003; // Reduced bias for sharper shadows
+        directionalLight.shadow.mapSize.width = 4096; // Increased resolution
+        directionalLight.shadow.mapSize.height = 4096; // Increased resolution
+        directionalLight.shadow.radius = 1; // Smaller radius for sharper shadows
         scene.add(directionalLight);
         
         // Add a fill light
         const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
         fillLight.position.set(5, 5, -5);
         scene.add(fillLight);
+        
+        // Add a spotlight specifically to highlight the sword
+        const swordLight = new THREE.SpotLight(0x7777ff, 2.0);
+        swordLight.position.set(0, 3, 0);
+        swordLight.angle = Math.PI / 6;
+        swordLight.penumbra = 0.2;
+        swordLight.decay = 2;
+        swordLight.distance = 10;
+        camera.add(swordLight);
+        swordLight.target = camera;
         
         // Ground plane with PBR material
         const planeGeometry = new THREE.PlaneGeometry(2000, 2000, 128, 128);
@@ -302,7 +315,11 @@
         let sword = null;
         let handOffset = new THREE.Object3D();
         camera.add(handOffset);
-        handOffset.position.set(0.5, -0.4, -1); 
+        handOffset.position.set(0.5, -0.2, -1); // Moved up a bit more
+        
+        // Sword particle system
+        const swordParticles = new THREE.Group();
+        handOffset.add(swordParticles);
         
         // Generate sword using AI
         generateSword();
@@ -310,7 +327,7 @@
         async function generateSword() {
             try {
                 const swordImage = await websim.imageGen({
-                    prompt: "A vertical fantasy sword standing upright with blade pointing up and handle at bottom, ornate metal handle at the bottom and shiny blade extending upward, centered on pure blue background, full sword visible in frame",
+                    prompt: "A vertical fantasy sword standing upright with blade pointing up and handle at bottom, ornate metal handle at the bottom and shiny enchanted blade extending upward with blue magical runes, centered on pure blue background, full sword visible in frame",
                     aspect_ratio: "1:1"
                 });
 
@@ -324,16 +341,17 @@
                     const swordTexture = new THREE.TextureLoader().load(transparentSwordUrl);
                     swordTexture.flipY = false;
                     
-                    // Improved sword material with emissive glow
+                    // Enhanced sword material with stronger emissive glow
                     const swordMaterial = new THREE.MeshStandardMaterial({ 
                         map: swordTexture,
                         transparent: true,
                         side: THREE.DoubleSide,
                         alphaTest: 0.5,
-                        emissive: 0x4444ff,
-                        emissiveIntensity: 0.3,
-                        metalness: 0.8,
-                        roughness: 0.2
+                        emissive: 0x4466ff,
+                        emissiveIntensity: 0.8,
+                        metalness: 0.9,
+                        roughness: 0.1,
+                        envMapIntensity: 1.5
                     });
                     
                     const swordGeometry = new THREE.PlaneGeometry(1, 1);
@@ -345,12 +363,55 @@
                     
                     handOffset.add(sword);
                     
+                    // Add sword glow effect
+                    addSwordGlowEffect();
+                    
                     document.getElementById('loading').style.display = 'none';
                 }
             } catch (error) {
                 console.error("Error generating sword:", error);
                 document.getElementById('loading').innerHTML = 'Error generating sword. Refresh to try again.';
             }
+        }
+        
+        // Function to create a glow effect around the sword
+        function addSwordGlowEffect() {
+            // Create particles for the sword magic effect
+            const particleCount = 50;
+            const particles = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            const colors = new Float32Array(particleCount * 3);
+            
+            for (let i = 0; i < particleCount; i++) {
+                // Position around the sword blade
+                positions[i * 3] = (Math.random() - 0.5) * 0.3; // x
+                positions[i * 3 + 1] = Math.random() * 0.6 - 0.2; // y
+                positions[i * 3 + 2] = (Math.random() - 0.5) * 0.3; // z
+                
+                // Blue/cyan colors
+                colors[i * 3] = 0.2 + Math.random() * 0.2; // r
+                colors[i * 3 + 1] = 0.5 + Math.random() * 0.5; // g
+                colors[i * 3 + 2] = 0.8 + Math.random() * 0.2; // b
+            }
+            
+            particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            particles.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            
+            const particleMaterial = new THREE.PointsMaterial({
+                size: 0.05,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending
+            });
+            
+            const particleSystem = new THREE.Points(particles, particleMaterial);
+            swordParticles.add(particleSystem);
+            
+            // Add a subtle blue light at the sword's position
+            const swordPointLight = new THREE.PointLight(0x3366ff, 2, 2);
+            swordPointLight.position.set(0, 0, 0);
+            handOffset.add(swordPointLight);
         }
         
         // Function to remove background from sword image
@@ -410,9 +471,36 @@
             controls.moveRight(-velocity.x * delta);
             controls.moveForward(-velocity.z * delta);
             
+            // Enhanced sword animation
             if (sword) {
                 sword.rotation.z = -Math.PI / 8 + Math.sin(clock.elapsedTime * 2) * 0.05;
-                sword.rotation.x = Math.PI / 6 + Math.PI; 
+                sword.rotation.x = Math.PI / 6 + Math.PI + Math.sin(clock.elapsedTime * 1.5) * 0.03; 
+                
+                // Pulse the emissive intensity for a magical effect
+                if (sword.material) {
+                    sword.material.emissiveIntensity = 0.6 + Math.sin(clock.elapsedTime * 5) * 0.4;
+                }
+            }
+            
+            // Animate particles if they exist
+            if (swordParticles && swordParticles.children.length > 0) {
+                for (let i = 0; i < swordParticles.children.length; i++) {
+                    const particles = swordParticles.children[i];
+                    if (particles.geometry && particles.geometry.attributes.position) {
+                        const positions = particles.geometry.attributes.position.array;
+                        for (let j = 0; j < positions.length; j += 3) {
+                            positions[j] += (Math.random() - 0.5) * 0.01;
+                            positions[j + 1] += (Math.random() - 0.5) * 0.01;
+                            positions[j + 2] += (Math.random() - 0.5) * 0.01;
+                            
+                            // Keep particles close to sword
+                            if (Math.abs(positions[j]) > 0.3) positions[j] *= 0.95;
+                            if (Math.abs(positions[j + 1]) > 0.6) positions[j + 1] *= 0.95;
+                            if (Math.abs(positions[j + 2]) > 0.3) positions[j + 2] *= 0.95;
+                        }
+                        particles.geometry.attributes.position.needsUpdate = true;
+                    }
+                }
             }
             
             // Use composer instead of renderer
@@ -427,6 +515,11 @@
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
             composer.setSize(window.innerWidth, window.innerHeight);
+            
+            // Update FXAA uniforms
+            const pixelRatio = renderer.getPixelRatio();
+            fxaaPass.material.uniforms['resolution'].value.x = 1 / (window.innerWidth * pixelRatio);
+            fxaaPass.material.uniforms['resolution'].value.y = 1 / (window.innerHeight * pixelRatio);
         }
         
         // Start animation
