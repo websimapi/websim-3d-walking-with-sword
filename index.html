@@ -317,9 +317,9 @@
         camera.add(handOffset);
         handOffset.position.set(0.5, -0.2, -1); // Moved up a bit more
         
-        // Sword particle system
-        const swordParticles = new THREE.Group();
-        handOffset.add(swordParticles);
+        // Sword glow container (renamed from swordParticles)
+        const swordGlowEffects = new THREE.Group();
+        handOffset.add(swordGlowEffects);
         
         // Generate sword using AI
         generateSword();
@@ -354,16 +354,22 @@
                         envMapIntensity: 1.5
                     });
                     
+                    // Create a slightly thicker plane for better shadow casting
                     const swordGeometry = new THREE.PlaneGeometry(1, 1);
                     sword = new THREE.Mesh(swordGeometry, swordMaterial);
                     
+                    // Set up sword positioning
                     sword.rotation.y = Math.PI / 2;
                     sword.rotation.z = -Math.PI / 8;
                     sword.rotation.x = Math.PI / 6 + Math.PI; 
                     
+                    // Enable shadow casting for the sword
+                    sword.castShadow = true;
+                    sword.receiveShadow = false;
+                    
                     handOffset.add(sword);
                     
-                    // Add sword glow effect
+                    // Add sword glow effect without particles
                     addSwordGlowEffect();
                     
                     document.getElementById('loading').style.display = 'none';
@@ -374,44 +380,39 @@
             }
         }
         
-        // Function to create a glow effect around the sword
+        // Function to create a glow effect around the sword without particles
         function addSwordGlowEffect() {
-            // Create particles for the sword magic effect
-            const particleCount = 50;
-            const particles = new THREE.BufferGeometry();
-            const positions = new Float32Array(particleCount * 3);
-            const colors = new Float32Array(particleCount * 3);
-            
-            for (let i = 0; i < particleCount; i++) {
-                // Position around the sword blade
-                positions[i * 3] = (Math.random() - 0.5) * 0.3; // x
-                positions[i * 3 + 1] = Math.random() * 0.6 - 0.2; // y
-                positions[i * 3 + 2] = (Math.random() - 0.5) * 0.3; // z
-                
-                // Blue/cyan colors
-                colors[i * 3] = 0.2 + Math.random() * 0.2; // r
-                colors[i * 3 + 1] = 0.5 + Math.random() * 0.5; // g
-                colors[i * 3 + 2] = 0.8 + Math.random() * 0.2; // b
-            }
-            
-            particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-            particles.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-            
-            const particleMaterial = new THREE.PointsMaterial({
-                size: 0.05,
-                vertexColors: true,
-                transparent: true,
-                opacity: 0.8,
-                blending: THREE.AdditiveBlending
-            });
-            
-            const particleSystem = new THREE.Points(particles, particleMaterial);
-            swordParticles.add(particleSystem);
-            
             // Add a subtle blue light at the sword's position
             const swordPointLight = new THREE.PointLight(0x3366ff, 2, 2);
             swordPointLight.position.set(0, 0, 0);
-            handOffset.add(swordPointLight);
+            swordGlowEffects.add(swordPointLight);
+            
+            // Add a second light for additional glow effect
+            const secondGlowLight = new THREE.PointLight(0x00aaff, 1.5, 1.5);
+            secondGlowLight.position.set(0, 0.2, 0);
+            swordGlowEffects.add(secondGlowLight);
+            
+            // Add a soft blue volumetric-like glow using a small sphere with emissive material
+            const glowSphereGeometry = new THREE.SphereGeometry(0.15, 16, 16);
+            const glowSphereMaterial = new THREE.MeshBasicMaterial({
+                color: 0x4466ff,
+                transparent: true,
+                opacity: 0.15,
+                blending: THREE.AdditiveBlending
+            });
+            const glowSphere = new THREE.Mesh(glowSphereGeometry, glowSphereMaterial);
+            swordGlowEffects.add(glowSphere);
+            
+            // Add a second smaller, brighter inner glow
+            const innerGlowGeometry = new THREE.SphereGeometry(0.08, 16, 16);
+            const innerGlowMaterial = new THREE.MeshBasicMaterial({
+                color: 0x66ccff,
+                transparent: true,
+                opacity: 0.2,
+                blending: THREE.AdditiveBlending
+            });
+            const innerGlow = new THREE.Mesh(innerGlowGeometry, innerGlowMaterial);
+            swordGlowEffects.add(innerGlow);
         }
         
         // Function to remove background from sword image
@@ -482,23 +483,23 @@
                 }
             }
             
-            // Animate particles if they exist
-            if (swordParticles && swordParticles.children.length > 0) {
-                for (let i = 0; i < swordParticles.children.length; i++) {
-                    const particles = swordParticles.children[i];
-                    if (particles.geometry && particles.geometry.attributes.position) {
-                        const positions = particles.geometry.attributes.position.array;
-                        for (let j = 0; j < positions.length; j += 3) {
-                            positions[j] += (Math.random() - 0.5) * 0.01;
-                            positions[j + 1] += (Math.random() - 0.5) * 0.01;
-                            positions[j + 2] += (Math.random() - 0.5) * 0.01;
-                            
-                            // Keep particles close to sword
-                            if (Math.abs(positions[j]) > 0.3) positions[j] *= 0.95;
-                            if (Math.abs(positions[j + 1]) > 0.6) positions[j + 1] *= 0.95;
-                            if (Math.abs(positions[j + 2]) > 0.3) positions[j + 2] *= 0.95;
-                        }
-                        particles.geometry.attributes.position.needsUpdate = true;
+            // Animate glow effects
+            if (swordGlowEffects && swordGlowEffects.children.length > 0) {
+                for (let i = 0; i < swordGlowEffects.children.length; i++) {
+                    const glowEffect = swordGlowEffects.children[i];
+                    if (glowEffect.type === 'PointLight') {
+                        // Animate light intensity
+                        glowEffect.intensity = (glowEffect.intensity * 0.95) + 
+                            (1.5 + Math.sin(clock.elapsedTime * 3 + i) * 0.5) * 0.05;
+                    }
+                    if (glowEffect.type === 'Mesh' && glowEffect.material) {
+                        // Animate glow sphere scale slightly
+                        const pulseFactor = 1 + Math.sin(clock.elapsedTime * 2 + i) * 0.1;
+                        glowEffect.scale.set(pulseFactor, pulseFactor, pulseFactor);
+                        
+                        // Animate opacity
+                        glowEffect.material.opacity = glowEffect.material.opacity * 0.95 + 
+                            (0.1 + Math.sin(clock.elapsedTime * 4 + i) * 0.05) * 0.05;
                     }
                 }
             }
