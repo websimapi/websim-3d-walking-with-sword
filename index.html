@@ -321,11 +321,15 @@
         const swordGlowEffects = new THREE.Group();
         handOffset.add(swordGlowEffects);
         
-        // Swing animation state variables
+        // Swing animation state variables - updated for 3-phase swing
         let isSwinging = false;
         let swingProgress = 0;
-        let swingDirection = 1; // 1 for forward swing, -1 for returning
-        const swingDuration = 0.25; // Faster swing
+        let swingPhase = "pullUp"; // New: track animation phase - pullUp, swingDown, return
+        const swingDuration = {
+            pullUp: 0.15,    // Faster initial pull-up
+            swingDown: 0.2,  // Medium speed swing down 
+            return: 0.25     // Slightly slower return
+        };
         
         // Generate sword using AI
         generateSword();
@@ -552,7 +556,7 @@
             if (event.button === 0 && !isSwinging && controls.isLocked) {
                 isSwinging = true;
                 swingProgress = 0;
-                swingDirection = 1; // Start with forward swing
+                swingPhase = "pullUp"; // Start with pull-up phase
                 
                 // Enable sword glow effects during swing
                 swordGlowEffects.children.forEach(light => {
@@ -592,17 +596,23 @@
             // Handle sword animation
             if (sword) {
                 if (isSwinging) {
-                    // Update swing progress
-                    swingProgress += delta * swingDirection / swingDuration;
+                    // Update swing progress based on current phase
+                    swingProgress += delta / swingDuration[swingPhase];
                     
-                    if (swingDirection === 1 && swingProgress >= 1) {
-                        // Switch to return swing
-                        swingProgress = 1;
-                        swingDirection = -1;
-                    } else if (swingDirection === -1 && swingProgress <= 0) {
+                    // Phase transition logic
+                    if (swingPhase === "pullUp" && swingProgress >= 1) {
+                        // Transition to swing down phase
+                        swingProgress = 0;
+                        swingPhase = "swingDown";
+                    } else if (swingPhase === "swingDown" && swingProgress >= 1) {
+                        // Transition to return phase
+                        swingProgress = 0;
+                        swingPhase = "return";
+                    } else if (swingPhase === "return" && swingProgress >= 1) {
                         // End swing animation
                         swingProgress = 0;
                         isSwinging = false;
+                        swingPhase = "pullUp"; // Reset for next swing
                         
                         // Disable sword glow effects
                         swordGlowEffects.children.forEach(light => {
@@ -615,26 +625,51 @@
                         }
                     }
                     
-                    // Calculate swing animation
-                    // Forward swing: rotate forward and slightly up
-                    // Base rotation values - updated with corrected leftward tilt
-                    const baseRotZ = -Math.PI / 8 - Math.PI / 6; // Corrected 30 degrees left tilt
+                    // Base rotation values - with corrected leftward tilt
+                    const baseRotZ = -Math.PI / 8 - Math.PI / 6; // 30 degrees left tilt
                     const baseRotX = Math.PI / 6 + Math.PI;
-                    const baseRotY = Math.PI / 2; // Reverted to original Y rotation
+                    const baseRotY = Math.PI / 2;
                     
-                    // Swing animation curve (ease in-out)
-                    const curve = swingDirection === 1 ? 
-                        easeInOutQuad(swingProgress) : 
-                        1 - easeInOutQuad(1 - swingProgress);
+                    // Animation curves for different phases
+                    let curveZ, curveX;
                     
-                    // Apply swing animation 
-                    sword.rotation.z = baseRotZ - curve * 1.5; 
-                    sword.rotation.x = baseRotX + curve * 1.0; 
-                    sword.rotation.y = baseRotY;
+                    // Apply different animations based on phase
+                    if (swingPhase === "pullUp") {
+                        // Pull up: rotate upward and slightly backward
+                        curveZ = easeInQuad(swingProgress) * 0.8; // Pull up on Z
+                        curveX = -easeInQuad(swingProgress) * 0.5; // Pull back slightly on X
+                        
+                        sword.rotation.z = baseRotZ + curveZ; // PULL UP (positive Z adjustment)
+                        sword.rotation.x = baseRotX + curveX; // Pull slightly back
+                    } 
+                    else if (swingPhase === "swingDown") {
+                        // Swing down: dramatic downward and forward motion 
+                        curveZ = easeOutQuad(swingProgress) * 2.2; // More amplitude (2.2 vs original 1.5)
+                        curveX = easeOutQuad(swingProgress) * 1.8;  // More forward motion
+                        
+                        sword.rotation.z = baseRotZ + 0.8 - curveZ; // Start from pulled-up position, swing DOWN
+                        sword.rotation.x = baseRotX - 0.5 + curveX; // Swing forward from pulled-back position
+                    }
+                    else if (swingPhase === "return") {
+                        // Return to idle: smooth transition back to resting position
+                        curveZ = (1 - easeInOutQuad(swingProgress)) * 1.4;
+                        curveX = (1 - easeInOutQuad(swingProgress)) * 1.3;
+                        
+                        sword.rotation.z = baseRotZ - curveZ; // Return from down position
+                        sword.rotation.x = baseRotX + curveX; // Return from forward position
+                    }
                     
-                    // Animate glow intensity based on swing
+                    sword.rotation.y = baseRotY; // Keep Y rotation consistent
+                    
+                    // Animate glow intensity based on swing phase and progress
                     if (sword.material) {
-                        sword.material.emissiveIntensity = 0.8 + curve * 0.7;
+                        if (swingPhase === "pullUp") {
+                            sword.material.emissiveIntensity = 0.8 + swingProgress * 0.4;
+                        } else if (swingPhase === "swingDown") {
+                            sword.material.emissiveIntensity = 1.2 + swingProgress * 0.8; // Brighter during swing down
+                        } else {
+                            sword.material.emissiveIntensity = 2.0 - swingProgress * 2.0; // Fade during return
+                        }
                     }
                     
                     // Animate lights during swing
@@ -642,8 +677,14 @@
                         for (let i = 0; i < swordGlowEffects.children.length; i++) {
                             const glowEffect = swordGlowEffects.children[i];
                             if (glowEffect.type === 'PointLight') {
-                                // Stronger light during the peak of the swing
-                                glowEffect.intensity = 1.5 + curve * 1.5;
+                                // Different light intensity based on phase
+                                if (swingPhase === "pullUp") {
+                                    glowEffect.intensity = 1.5 + swingProgress * 1.0;
+                                } else if (swingPhase === "swingDown") {
+                                    glowEffect.intensity = 2.5 + swingProgress * 1.5; // Brightest during swing down
+                                } else {
+                                    glowEffect.intensity = 4.0 - swingProgress * 4.0; // Fade during return
+                                }
                             }
                         }
                     }
@@ -664,9 +705,18 @@
             composer.render();
         }
         
-        // Easing function for smooth animation
+        // Enhanced easing functions for more dynamic animations
         function easeInOutQuad(t) {
             return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        }
+        
+        // New easing functions for different phases of the swing
+        function easeInQuad(t) {
+            return t * t;
+        }
+        
+        function easeOutQuad(t) {
+            return 1 - (1 - t) * (1 - t);
         }
         
         // Handle window resize
