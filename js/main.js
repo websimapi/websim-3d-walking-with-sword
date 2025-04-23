@@ -1,31 +1,62 @@
 import * as THREE from 'three';
 import { initScene, renderer, composer, scene, camera } from './sceneSetup.js';
 import { initControls, setupMovementControls } from './controls.js';
-import { initSword, swordInventory, generateNewSword, generateArmImage } from './sword.js';
+import { initSword, swordInventory, generateNewSword } from './sword.js';
 import { initInventorySystem, showInventory } from './inventory.js';
 import { setupAnimationLoop } from './animation.js';
+import { initMultiplayer, room, isDesktop } from './multiplayer.js';
 
 // Initialize scene and renderer
 initScene();
 
-// Initialize first-person controls
-const controls = initControls(camera, document.body);
+// Initialize multiplayer first to detect device type
+async function init() {
+    try {
+        // Initialize multiplayer functionality
+        const { deviceType } = await initMultiplayer();
+        console.log(`Running as ${deviceType} device`);
+        
+        // Initialize first-person controls with device-specific behavior
+        const controls = initControls(camera, document.body);
+        
+        // Show appropriate instructions
+        if (isDesktop) {
+            // Initialize sword functionality (only for desktop)
+            initSword(camera);
+            
+            // Initialize inventory system (only for desktop)
+            initInventorySystem(controls);
+            
+            // Generate first sword and start inventory (only for desktop)
+            generateNewSword();
+            
+            // Set up movement controls
+            setupMovementControls();
+        }
+        
+        // Set up main animation loop
+        setupAnimationLoop();
+        
+        // Hide loading screen
+        document.getElementById('loading').style.display = 'none';
+        
+        // Show appropriate UI
+        if (isDesktop) {
+            document.getElementById('instructions').style.display = 'block';
+        }
+        
+    } catch (error) {
+        console.error('Error initializing application:', error);
+        document.getElementById('loading').innerHTML = `
+            <h2>Error</h2>
+            <p>Failed to initialize the application: ${error.message}</p>
+            <button onclick="location.reload()">Try Again</button>
+        `;
+    }
+}
 
-// Initialize sword functionality
-initSword(camera);
-
-// Initialize inventory system
-initInventorySystem(controls);
-
-// Set up movement controls
-setupMovementControls();
-
-// Generate first sword and arm
-generateNewSword();
-generateArmImage();
-
-// Set up main animation loop
-setupAnimationLoop();
+// Start initialization
+init();
 
 // Handle window resize
 window.addEventListener('resize', onWindowResize, false);

@@ -1,21 +1,12 @@
 import * as THREE from 'three';
 import { scene, camera } from './sceneSetup.js';
 import { removeSwordBackground } from './utils.js';
+import { room, isDesktop } from './multiplayer.js';
 
 // Sword and hand positioning
 export let handOffset = new THREE.Object3D();
 export let sword = null;
 export let swordGlowEffects = new THREE.Group();
-
-// Arm variables
-export let arm = null;
-export let armImage = null;
-export let isArmShowing = false;
-
-// Arm inventory
-export const armInventory = [];
-export let currentArmIndex = 0;
-export let selectedArmIndex = 0;
 
 // Sword inventory
 export const swordInventory = [];
@@ -45,12 +36,28 @@ export function initSword(camera) {
             generateNewSword();
         });
     });
+    
+    // Add listener for remote sword swing requests
+    if (room) {
+        room.subscribePresenceUpdateRequests((updateRequest, fromClientId) => {
+            if (updateRequest.type === 'swordSwingTrigger') {
+                handleSwordSwing(updateRequest.intensity);
+                
+                // Broadcast swing event to all players
+                room.send({
+                    type: 'swordSwing',
+                    clientId: room.clientId,
+                    username: room.peers[room.clientId]?.username || 'Unknown Player',
+                    intensity: updateRequest.intensity || 1
+                });
+            }
+        });
+    }
 }
 
 export async function generateNewSword() {
     try {
         document.getElementById('loading').style.display = 'flex';
-        document.getElementById('loading').querySelector('h2').textContent = "Generating your sword...";
         
         // Enhanced detailed prompt for better background removal
         const swordImage = await websim.imageGen({
@@ -85,8 +92,7 @@ The sword must appear as if it was photographed against a perfectly flat blue sc
                 originalUrl: swordImage.url,
                 processedUrl: transparentSwordUrl,
                 name: `Sword ${swordInventory.length + 1}`,
-                timestamp: Date.now(),
-                rotation: 0 // Initialize rotation to 0 degrees
+                timestamp: Date.now()
             };
             
             swordInventory.push(swordData);
@@ -111,82 +117,9 @@ The sword must appear as if it was photographed against a perfectly flat blue sc
     }
 }
 
-export async function generateNewArm() {
-    try {
-        document.getElementById('loading').style.display = 'flex';
-        document.getElementById('loading').querySelector('h2').textContent = "Generating your arm...";
-        
-        const armImageResult = await websim.imageGen({
-            prompt: `Create a high-contrast first-person view of a right arm and fist with these EXACT specifications:
-
-- BACKGROUND: Perfect solid #FFFFFF white background (RGB 255,255,255) with absolutely NO gradients, NO texture, NO shading, and NO variations
-- POSITIONING: Arm extends from bottom right of frame toward center, in a natural first-person perspective
-- COMPOSITION: Full fist and partial forearm visible, as if viewed by the person themselves
-- ARM DETAILS: 
-  * Realistic human arm with slightly tanned skin tone
-  * Fist clenched but not aggressive, in a natural resting position
-  * Clear definition of knuckles and muscle tone
-  * High contrast between arm and background
-  * Clear, defined edges with no blur between arm and background
-- LIGHTING: Even lighting with minimal shadows
-- STYLE: Clean, detailed render with crisp edges
-- ISOLATION: Absolutely NO elements besides the arm/fist and solid white background
-
-The arm must appear as if it was photographed against a perfectly flat white screen with sharp delineation between arm and background.`,
-            aspect_ratio: "1:1"
-        });
-
-        const img = new Image();
-        img.crossOrigin = "Anonymous";
-        img.src = armImageResult.url;
-        
-        img.onload = function() {
-            const transparentArmUrl = removeSwordBackground(img);
-            
-            // Add to arm inventory
-            const armData = {
-                originalUrl: armImageResult.url,
-                processedUrl: transparentArmUrl,
-                name: `Arm ${armInventory.length + 1}`,
-                timestamp: Date.now(),
-                rotation: 0 // Initialize rotation to 0 degrees
-            };
-            
-            armInventory.push(armData);
-            const newIndex = armInventory.length - 1;
-            
-            // Update the arm image reference
-            armImage = transparentArmUrl;
-            setSelectedArmIndex(newIndex);
-            currentArmIndex = newIndex;
-            
-            // Create arm mesh with the new image
-            createArmMesh();
-            
-            // Update the inventory UI
-            import('./inventory.js').then(module => {
-                module.updateInventoryUI();
-                
-                document.getElementById('loading').style.display = 'none';
-                
-                // Show arm if no sword is equipped
-                if (sword === null) {
-                    showArm();
-                }
-            });
-        }
-    } catch (error) {
-        console.error("Error generating arm:", error);
-        document.getElementById('loading').innerHTML = 'Error generating arm. Refresh to try again.';
-    }
-}
-
 export function equipSword(index) {
     if (index >= 0 && index < swordInventory.length) {
         currentSwordIndex = index;
-        
-        // Hide arm before equipping sword
-        hideArm();
         
         // Remove existing sword and effects
         if (sword) {
@@ -224,17 +157,10 @@ export function equipSword(index) {
         const swordGeometry = new THREE.PlaneGeometry(1, 1);
         sword = new THREE.Mesh(swordGeometry, swordMaterial);
         
-        // Get rotation from inventory
-        const itemRotation = swordInventory[index].rotation || 0;
-        
-        // Set up sword positioning with base rotations
-        sword.rotation.y = Math.PI / 2;
-        sword.rotation.z = -Math.PI / 8 - Math.PI / 6;
-        sword.rotation.x = Math.PI / 6 + Math.PI;
-        
-        // Apply the inventory rotation using rotateOnWorldAxis to ensure consistent rotation
-        // regardless of the object's current orientation
-        sword.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), itemRotation * Math.PI / 180);
+        // Set up sword positioning - fixed rotation for correct leftward angle
+        sword.rotation.y = Math.PI / 2; // Reverted to original rotation
+        sword.rotation.z = -Math.PI / 8 - Math.PI / 6; // Added 30 degrees left tilt on Z axis
+        sword.rotation.x = Math.PI / 6 + Math.PI; 
         
         // Enable shadow casting for the sword
         sword.castShadow = true;
@@ -244,174 +170,32 @@ export function equipSword(index) {
         
         // Add sword glow effect
         addSwordGlowEffect();
-    }
-}
-
-export function unequipSword() {
-    if (sword) {
-        handOffset.remove(sword);
-        sword = null;
-        currentSwordIndex = -1;
         
-        // Clear existing glow effects
-        while (swordGlowEffects.children.length > 0) {
-            swordGlowEffects.remove(swordGlowEffects.children[0]);
-        }
-        
-        // Reset swing state
-        swingState.isSwinging = false;
-        swingState.swingProgress = 0;
-        
-        // Show arm if available
-        showArm();
-    }
-}
-
-export function showArm() {
-    if (arm && !isArmShowing) {
-        handOffset.add(arm);
-        isArmShowing = true;
-    } else if (!arm && armImage) {
-        createArmMesh();
-    } else if (armInventory.length === 0) {
-        generateArmImage();
-    }
-}
-
-export function hideArm() {
-    if (arm && isArmShowing) {
-        handOffset.remove(arm);
-        isArmShowing = false;
-    }
-}
-
-export async function generateArmImage() {
-    try {
-        document.getElementById('loading').style.display = 'flex';
-        document.getElementById('loading').querySelector('h2').textContent = "Generating your arm...";
-        
-        const armImageResult = await websim.imageGen({
-            prompt: `Create a high-contrast first-person view of a right arm and fist with these EXACT specifications:
-
-- BACKGROUND: Perfect solid #FFFFFF white background (RGB 255,255,255) with absolutely NO gradients, NO texture, NO shading, and NO variations
-- POSITIONING: Arm extends from bottom right of frame toward center, in a natural first-person perspective
-- COMPOSITION: Full fist and partial forearm visible, as if viewed by the person themselves
-- ARM DETAILS: 
-  * Realistic human arm with slightly tanned skin tone
-  * Fist clenched but not aggressive, in a natural resting position
-  * Clear definition of knuckles and muscle tone
-  * High contrast between arm and background
-  * Clear, defined edges with no blur between arm and background
-- LIGHTING: Even lighting with minimal shadows
-- STYLE: Clean, detailed render with crisp edges
-- ISOLATION: Absolutely NO elements besides the arm/fist and solid white background
-
-The arm must appear as if it was photographed against a perfectly flat white screen with sharp delineation between arm and background.`,
-            aspect_ratio: "1:1"
-        });
-
-        const img = new Image();
-        img.crossOrigin = "Anonymous";
-        img.src = armImageResult.url;
-        
-        img.onload = function() {
-            const transparentArmUrl = removeSwordBackground(img);
-            
-            // Add to arm inventory
-            const armData = {
-                originalUrl: armImageResult.url,
-                processedUrl: transparentArmUrl,
-                name: `Arm ${armInventory.length + 1}`,
-                timestamp: Date.now(),
-                rotation: 0 // Initialize rotation to 0 degrees
-            };
-            
-            armInventory.push(armData);
-            currentArmIndex = 0;
-            selectedArmIndex = 0;
-            
-            armImage = transparentArmUrl;
-            createArmMesh();
-            document.getElementById('loading').style.display = 'none';
-            
-            // Show arm if no sword is equipped
-            if (sword === null) {
-                showArm();
-            }
-        }
-    } catch (error) {
-        console.error("Error generating arm:", error);
-        document.getElementById('loading').innerHTML = 'Error generating arm. Refresh to try again.';
-    }
-}
-
-export function equipArm(index) {
-    if (index >= 0 && index < armInventory.length) {
-        currentArmIndex = index;
-        armImage = armInventory[index].processedUrl;
-        
-        // Recreate arm mesh with the new texture
-        createArmMesh();
-        
-        // Show arm if no sword is equipped
-        if (sword === null && !isArmShowing) {
-            showArm();
+        // Update multiplayer state to show the equipped sword
+        if (room && isDesktop) {
+            room.updatePresence({
+                equippedSword: {
+                    index: index,
+                    name: swordInventory[index].name
+                }
+            });
         }
     }
 }
 
-function createArmMesh() {
-    if (!armImage) return;
-    
-    // Remove existing arm if present
-    if (arm) {
-        if (isArmShowing) {
-            handOffset.remove(arm);
-        }
-        arm = null;
-    }
-    
-    // Create the arm with the texture
-    const armTexture = new THREE.TextureLoader().load(armImage);
-    armTexture.flipY = false;
-    
-    const armMaterial = new THREE.MeshStandardMaterial({ 
-        map: armTexture,
-        transparent: true,
-        side: THREE.DoubleSide,
-        alphaTest: 0.5,
-        metalness: 0.1,
-        roughness: 0.9,
-        envMapIntensity: 0.5
-    });
-    
-    const armGeometry = new THREE.PlaneGeometry(1.2, 1.2);
-    arm = new THREE.Mesh(armGeometry, armMaterial);
-    
-    // Get rotation from inventory
-    const itemRotation = armInventory[currentArmIndex].rotation || 0;
-    
-    // Set up arm positioning with base rotations
-    arm.rotation.y = Math.PI / 2;
-    arm.rotation.z = -Math.PI / 8 - Math.PI / 6;
-    arm.rotation.x = Math.PI / 6 + Math.PI;
-    
-    // Apply the inventory rotation using rotateOnWorldAxis to ensure consistent rotation
-    // regardless of the object's current orientation
-    arm.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), itemRotation * Math.PI / 180);
-    
-    // Show arm if no sword is equipped
-    if (sword === null) {
-        handOffset.add(arm);
-        isArmShowing = true;
-    }
-}
-
-export function handleSwordSwing() {
+export function handleSwordSwing(intensity = 1) {
     if (!swingState.isSwinging) {
         swingState.isSwinging = true;
         swingState.swingProgress = 0;
         swingState.swingDirection = 1; // Start with forward swing
+        
+        // Adjust swing duration based on intensity (if provided by mobile device)
+        if (intensity > 1) {
+            // Faster swing for stronger intensity (but not too fast)
+            swingState.swingDuration = Math.max(0.15, 0.25 - (intensity * 0.005));
+        } else {
+            swingState.swingDuration = 0.25; // Default duration
+        }
         
         // Enable sword glow effects during swing
         swordGlowEffects.children.forEach(light => {
@@ -422,6 +206,16 @@ export function handleSwordSwing() {
         if (sword && sword.material) {
             sword.material.emissive = new THREE.Color(0x4466ff);
             sword.material.emissiveIntensity = 0.8;
+        }
+        
+        // Send sword swing message to other players if this wasn't triggered by a mobile device
+        if (room && isDesktop) {
+            room.send({
+                type: 'swordSwing',
+                clientId: room.clientId,
+                username: room.peers[room.clientId]?.username || 'Unknown Player',
+                intensity: intensity
+            });
         }
     }
 }
@@ -441,48 +235,7 @@ function addSwordGlowEffect() {
     swordGlowEffects.add(secondGlowLight);
 }
 
-// Add setter functions
+// Add this setter function to properly update the selectedSwordIndex
 export function setSelectedSwordIndex(index) {
     selectedSwordIndex = index;
-}
-
-export function setSelectedArmIndex(index) {
-    selectedArmIndex = index;
-}
-
-// New functions for image rotation
-export function rotateSwordImage(index, rotationDelta) {
-    if (index >= 0 && index < swordInventory.length) {
-        // Initialize rotation if not set
-        if (swordInventory[index].rotation === undefined) {
-            swordInventory[index].rotation = 0;
-        }
-        
-        // Add rotation delta (90 or -90 degrees)
-        swordInventory[index].rotation = (swordInventory[index].rotation + rotationDelta) % 360;
-        
-        // Update equipped sword if this is the current sword
-        if (index === currentSwordIndex && sword) {
-            // Remove and recreate the sword with new rotation
-            equipSword(index);
-        }
-    }
-}
-
-export function rotateArmImage(index, rotationDelta) {
-    if (index >= 0 && index < armInventory.length) {
-        // Initialize rotation if not set
-        if (armInventory[index].rotation === undefined) {
-            armInventory[index].rotation = 0;
-        }
-        
-        // Add rotation delta (90 or -90 degrees)
-        armInventory[index].rotation = (armInventory[index].rotation + rotationDelta) % 360;
-        
-        // Update equipped arm if this is the current arm
-        if (index === currentArmIndex && arm) {
-            // Remove and recreate the arm with new rotation
-            equipArm(index);
-        }
-    }
 }
