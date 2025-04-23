@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { camera } from './sceneSetup.js';
 import { showInventory } from './inventory.js';
-import { handleSwordSwing } from './sword.js';
+import { handleSwordSwing, unequipSword } from './sword.js';
 
 // Movement state
 export const movementState = {
@@ -61,6 +61,13 @@ export function setupMovementControls() {
                 }, 100);
             } else if (document.getElementById('inventory-container').style.display === 'none') {
                 showInventory();
+            }
+        }
+        
+        // Add E key to unequip weapon
+        if (event.key === 'e' || event.key === 'E') {
+            if (controls.isLocked) {
+                unequipSword();
             }
         }
         

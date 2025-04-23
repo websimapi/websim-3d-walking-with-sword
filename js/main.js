@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { initScene, renderer, composer, scene, camera } from './sceneSetup.js';
 import { initControls, setupMovementControls } from './controls.js';
-import { initSword, swordInventory, generateNewSword } from './sword.js';
+import { initSword, swordInventory, generateNewSword, generateArmImage } from './sword.js';
 import { initInventorySystem, showInventory } from './inventory.js';
 import { setupAnimationLoop } from './animation.js';
 
@@ -20,8 +20,9 @@ initInventorySystem(controls);
 // Set up movement controls
 setupMovementControls();
 
-// Generate first sword and start inventory
+// Generate first sword and arm
 generateNewSword();
+generateArmImage();
 
 // Set up main animation loop
 setupAnimationLoop();
