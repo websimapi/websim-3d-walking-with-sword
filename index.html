@@ -325,7 +325,7 @@
         let isSwinging = false;
         let swingProgress = 0;
         let swingDirection = 1; // 1 for forward swing, -1 for returning
-        const swingDuration = 0.5; // seconds for one-way swing
+        const swingDuration = 0.25; // Faster swing
         
         // Generate sword using AI
         generateSword();
@@ -354,7 +354,7 @@
                         side: THREE.DoubleSide,
                         alphaTest: 0.5,
                         emissive: 0x4466ff,
-                        emissiveIntensity: 0.8,
+                        emissiveIntensity: 0, // Start with no glow
                         metalness: 0.9,
                         roughness: 0.1,
                         envMapIntensity: 1.5
@@ -518,9 +518,9 @@
                         easeInOutQuad(swingProgress) : 
                         1 - easeInOutQuad(1 - swingProgress);
                     
-                    // Apply swing animation
-                    sword.rotation.z = baseRotZ - curve * 0.8; // Swing forward
-                    sword.rotation.x = baseRotX + curve * 0.6; // Swing upward
+                    // Apply swing animation 
+                    sword.rotation.z = baseRotZ - curve * 1.5; 
+                    sword.rotation.x = baseRotX + curve * 1.0; 
                     
                     // Animate glow intensity based on swing
                     if (sword.material) {
@@ -538,9 +538,14 @@
                         }
                     }
                 } else {
-                    // Idle sword animation
+                    // Idle sword animation 
                     sword.rotation.z = -Math.PI / 8 + Math.sin(clock.elapsedTime * 2) * 0.05;
                     sword.rotation.x = Math.PI / 6 + Math.PI + Math.sin(clock.elapsedTime * 1.5) * 0.03;
+                    
+                    // Ensure emissive effect is off during idle
+                    if (sword && sword.material) {
+                        sword.material.emissiveIntensity = 0;
+                    }
                 }
             }
             
