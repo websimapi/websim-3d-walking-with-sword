@@ -53,92 +53,181 @@
     <script type="module">
         import * as THREE from 'three';
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+        import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+        import { PMREMGenerator } from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
         // Scene setup
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87ceeb); // Sky blue
         
         // Camera setup
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.y = 1.7; // Eye height
         scene.add(camera);
         
-        // Renderer setup
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        // Renderer setup with improved settings
+        const renderer = new THREE.WebGLRenderer({ 
+            antialias: true,
+            powerPreference: "high-performance"
+        });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        
+        // Enable physically correct lighting
+        renderer.physicallyCorrectLights = true;
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.0;
+        
+        // Improved shadow settings
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Enhanced shadow quality
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.body.appendChild(renderer.domElement);
         
-        // Light setup - Enhanced lighting
-        const ambientLight = new THREE.AmbientLight(0x404040, 1.0); // Increased from 0.5 to 1.0
+        // Post-processing setup
+        const composer = new EffectComposer(renderer);
+        const renderPass = new RenderPass(scene, camera);
+        composer.addPass(renderPass);
+        
+        // Ambient Occlusion
+        const ssaoPass = new SSAOPass(scene, camera, window.innerWidth, window.innerHeight);
+        ssaoPass.kernelRadius = 16;
+        ssaoPass.minDistance = 0.005;
+        ssaoPass.maxDistance = 0.1;
+        composer.addPass(ssaoPass);
+        
+        // Bloom effect for light glow
+        const bloomPass = new UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            0.2,  // strength
+            0.1,  // radius
+            0.9   // threshold
+        );
+        composer.addPass(bloomPass);
+        
+        // Final output pass
+        const outputPass = new OutputPass();
+        composer.addPass(outputPass);
+        
+        // Load HDR environment map
+        const pmremGenerator = new PMREMGenerator(renderer);
+        pmremGenerator.compileEquirectangularShader();
+        
+        new RGBELoader()
+            .load('https://threejs.org/examples/textures/equirectangular/venice_sunset_1k.hdr', function(texture) {
+                const envMap = pmremGenerator.fromEquirectangular(texture).texture;
+                scene.environment = envMap;
+                scene.background = new THREE.Color(0x87ceeb); // Keep sky blue
+                
+                texture.dispose();
+                pmremGenerator.dispose();
+            });
+        
+        // Enhanced lighting setup
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.3);
         scene.add(ambientLight);
         
-        // Main directional light with enhanced shadows
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2); // Increased from 0.8 to 1.2
-        directionalLight.position.set(5, 10, 7.5);
+        // Hemisphere light for sky/ground illumination
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+        hemiLight.position.set(0, 20, 0);
+        scene.add(hemiLight);
+        
+        // Main directional light (sun)
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        directionalLight.position.set(-5, 12, 8);
         directionalLight.castShadow = true;
-        // Improve shadow quality and range
-        directionalLight.shadow.mapSize.width = 2048; // Increased from 1024
-        directionalLight.shadow.mapSize.height = 2048; // Increased from 1024
+        
+        // Improved shadow map settings
         directionalLight.shadow.camera.near = 0.5;
         directionalLight.shadow.camera.far = 50;
         directionalLight.shadow.camera.left = -20;
         directionalLight.shadow.camera.right = 20;
         directionalLight.shadow.camera.top = 20;
         directionalLight.shadow.camera.bottom = -20;
-        directionalLight.shadow.bias = -0.0001; // Adjusted for better shadow accuracy
-        directionalLight.shadow.normalBias = 0.02; // Added to fix shadow artifacts
+        directionalLight.shadow.bias = -0.0005;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
         scene.add(directionalLight);
         
-        // Add spotlight for dramatic effect
-        const spotLight = new THREE.SpotLight(0xffffcc, 1.0); // Increased from 0.8 to 1.0
-        spotLight.position.set(-5, 8, 2);
-        spotLight.angle = Math.PI / 6;
-        spotLight.penumbra = 0.3;
-        spotLight.castShadow = true;
-        spotLight.shadow.mapSize.width = 1024;
-        spotLight.shadow.mapSize.height = 1024;
-        scene.add(spotLight);
+        // Add a fill light
+        const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
+        fillLight.position.set(5, 5, -5);
+        scene.add(fillLight);
         
-        // Add sword-specific light to highlight it
-        const swordLight = new THREE.PointLight(0xffffff, 0.7);
-        swordLight.distance = 3;
-        let handOffset = new THREE.Object3D();
-        camera.add(handOffset);
-        handOffset.position.set(0.5, -0.2, -1); // Adjusted position slightly up
-        handOffset.add(swordLight);
-        swordLight.position.set(0, 0, 0.5);
-        
-        // Add a few random objects to showcase shadows
-        function addRandomObjects() {
-            const objectGeometry = new THREE.BoxGeometry(1, 1, 1);
-            const objectMaterial = new THREE.MeshStandardMaterial({ color: 0xccaa88 });
-            
-            for (let i = 0; i < 15; i++) {
-                const object = new THREE.Mesh(objectGeometry, objectMaterial);
-                object.position.x = Math.random() * 20 - 10;
-                object.position.z = Math.random() * 20 - 10;
-                object.position.y = 0.5;
-                object.castShadow = true;
-                object.receiveShadow = true;
-                scene.add(object);
-            }
-        }
-        addRandomObjects();
-        
-        // Ground plane
-        const planeGeometry = new THREE.PlaneGeometry(2000, 2000);
+        // Ground plane with PBR material
+        const planeGeometry = new THREE.PlaneGeometry(2000, 2000, 128, 128);
         const planeMaterial = new THREE.MeshStandardMaterial({ 
             color: 0x339933,
             side: THREE.DoubleSide,
             roughness: 0.8,
-            metalness: 0.2
+            metalness: 0.1,
+            envMapIntensity: 0.5
         });
         const plane = new THREE.Mesh(planeGeometry, planeMaterial);
         plane.rotation.x = -Math.PI / 2;
         plane.receiveShadow = true;
         scene.add(plane);
+        
+        // Add some random objects to show off lighting effects
+        function addRandomObjects() {
+            // Add some rocks and trees
+            for (let i = 0; i < 50; i++) {
+                // Random position away from the player
+                let x = Math.random() * 100 - 50;
+                let z = Math.random() * 100 - 50;
+                
+                // Ensure objects aren't too close to the player
+                if (Math.abs(x) < 5 && Math.abs(z) < 5) continue;
+                
+                // Create a rock or tree
+                if (Math.random() > 0.5) {
+                    // Rock
+                    const rockGeometry = new THREE.DodecahedronGeometry(Math.random() * 1 + 0.5, 0);
+                    const rockMaterial = new THREE.MeshStandardMaterial({
+                        color: 0x888888,
+                        roughness: 0.9,
+                        metalness: 0.1,
+                        envMapIntensity: 0.5
+                    });
+                    const rock = new THREE.Mesh(rockGeometry, rockMaterial);
+                    rock.position.set(x, rockGeometry.parameters.radius * 0.5, z);
+                    rock.castShadow = true;
+                    rock.receiveShadow = true;
+                    scene.add(rock);
+                } else {
+                    // Tree (simple cylinder and cone)
+                    const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.3, 1.5, 8);
+                    const trunkMaterial = new THREE.MeshStandardMaterial({
+                        color: 0x8B4513,
+                        roughness: 0.9,
+                        metalness: 0.0
+                    });
+                    const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+                    trunk.position.set(x, 0.75, z);
+                    trunk.castShadow = true;
+                    trunk.receiveShadow = true;
+                    
+                    const leavesGeometry = new THREE.ConeGeometry(1, 2, 8);
+                    const leavesMaterial = new THREE.MeshStandardMaterial({
+                        color: 0x1a472a,
+                        roughness: 0.8,
+                        metalness: 0.0
+                    });
+                    const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
+                    leaves.position.set(x, 2.5, z);
+                    leaves.castShadow = true;
+                    
+                    scene.add(trunk);
+                    scene.add(leaves);
+                }
+            }
+        }
+        
+        addRandomObjects();
         
         // Controls setup
         const controls = new PointerLockControls(camera, document.body);
@@ -209,14 +298,19 @@
             }
         }
         
-        // Generate sword using AI
+        // Modify the hand offset position and rotation for better visibility
         let sword = null;
+        let handOffset = new THREE.Object3D();
+        camera.add(handOffset);
+        handOffset.position.set(0.5, -0.4, -1); 
+        
+        // Generate sword using AI
         generateSword();
         
         async function generateSword() {
             try {
                 const swordImage = await websim.imageGen({
-                    prompt: "A vertical fantasy sword standing upright with blade pointing up and handle at the bottom portion of the image, ornate metal handle at the bottom and shiny blade extending upward, centered on pure blue background, full sword visible in frame, highly detailed with gold and silver accents",
+                    prompt: "A vertical fantasy sword standing upright with blade pointing up and handle at bottom, ornate metal handle at the bottom and shiny blade extending upward, centered on pure blue background, full sword visible in frame",
                     aspect_ratio: "1:1"
                 });
 
@@ -230,19 +324,18 @@
                     const swordTexture = new THREE.TextureLoader().load(transparentSwordUrl);
                     swordTexture.flipY = false;
                     
-                    // Use MeshStandardMaterial with enhanced properties
+                    // Improved sword material with emissive glow
                     const swordMaterial = new THREE.MeshStandardMaterial({ 
                         map: swordTexture,
                         transparent: true,
                         side: THREE.DoubleSide,
                         alphaTest: 0.5,
-                        roughness: 0.3, // Lowered for more shine
-                        metalness: 0.8, // Increased for more metal look
-                        emissive: 0x111111, // Slight emissive to make it more visible
-                        emissiveIntensity: 0.2
+                        emissive: 0x4444ff,
+                        emissiveIntensity: 0.3,
+                        metalness: 0.8,
+                        roughness: 0.2
                     });
                     
-                    // Create a box geometry for better shadow casting
                     const swordGeometry = new THREE.PlaneGeometry(1, 1);
                     sword = new THREE.Mesh(swordGeometry, swordMaterial);
                     
@@ -250,29 +343,9 @@
                     sword.rotation.z = -Math.PI / 8;
                     sword.rotation.x = Math.PI / 6 + Math.PI; 
                     
-                    // Enhanced shadow properties
-                    sword.castShadow = true;
-                    sword.receiveShadow = true;
-                    
-                    // Create a separate shadow-casting object that follows the sword
-                    // This helps create a more accurate shadow
-                    const shadowCaster = new THREE.Mesh(
-                        new THREE.BoxGeometry(0.05, 0.8, 0.2),
-                        new THREE.MeshBasicMaterial({ 
-                            transparent: true, 
-                            opacity: 0, // Invisible but casts shadow
-                            side: THREE.DoubleSide 
-                        })
-                    );
-                    shadowCaster.castShadow = true;
-                    shadowCaster.position.set(0, 0, 0);
-                    sword.add(shadowCaster);
-                    
                     handOffset.add(sword);
                     
                     document.getElementById('loading').style.display = 'none';
-                    
-                    console.log("Sword added to scene", sword);
                 }
             } catch (error) {
                 console.error("Error generating sword:", error);
@@ -342,13 +415,8 @@
                 sword.rotation.x = Math.PI / 6 + Math.PI; 
             }
             
-            // Animate the spotlight for dramatic effect
-            if (spotLight) {
-                spotLight.position.x = Math.sin(clock.elapsedTime * 0.5) * 8;
-                spotLight.position.z = Math.cos(clock.elapsedTime * 0.5) * 8;
-            }
-            
-            renderer.render(scene, camera);
+            // Use composer instead of renderer
+            composer.render();
         }
         
         // Handle window resize
@@ -358,6 +426,7 @@
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
         }
         
         // Start animation
