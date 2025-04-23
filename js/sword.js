@@ -204,25 +204,29 @@ export function hideArm() {
 export async function generateArmImage() {
     try {
         document.getElementById('loading').style.display = 'flex';
-        document.getElementById('loading').querySelector('h2').textContent = "Generating your arm...";
+        document.getElementById('loading').querySelector('h2').textContent = "Generating your armored gauntlet...";
         
         const armImageResult = await websim.imageGen({
-            prompt: `Create a high-contrast first-person view of a right arm and fist with these EXACT specifications:
+            prompt: `Create a high-contrast first-person view of a medieval knight's right arm and gauntlet with these EXACT specifications:
 
 - BACKGROUND: Perfect solid #0000FF blue background (RGB 0,0,255) with absolutely NO gradients, NO texture, NO shading, and NO variations
-- POSITIONING: Arm extends from bottom right of frame toward center, in a natural first-person perspective
-- COMPOSITION: Full fist and partial forearm visible, as if viewed by the person themselves
+- POSITIONING: Armored arm extends from bottom right of frame toward center, in a natural first-person perspective
+- COMPOSITION: Full gauntlet and partial forearm visible, as if viewed by the knight themselves
 - ARM DETAILS: 
-  * Realistic human arm with slightly tanned skin tone
-  * Fist clenched but not aggressive, in a natural resting position
-  * Clear definition of knuckles and muscle tone
-  * High contrast between arm and background
+  * Medieval plate armor covering the entire arm
+  * Intricate steel or iron gauntlet with articulated finger plates 
+  * Decorative etched patterns or family crest on the forearm plates
+  * Small leather straps or gold/silver trim accents
+  * Chain mail visible at joints or connections between armor pieces
+  * Slightly weathered metal with subtle battle scratches
+  * High contrast between armored arm and background
   * Clear, defined edges with no blur between arm and background
-- LIGHTING: Even lighting with minimal shadows
-- STYLE: Clean, detailed render with crisp edges
-- ISOLATION: Absolutely NO elements besides the arm/fist and solid blue background
+- LIGHTING: Metal should have realistic reflections with slight blue magical glow highlights
+- HAND POSITION: Gauntlet in relaxed position, slightly curved as if ready to grasp a sword
+- STYLE: Highly detailed, realistic medieval armor design with crisp edges
+- ISOLATION: Absolutely NO elements besides the armored arm/gauntlet and solid blue background
 
-The arm must appear as if it was photographed against a perfectly flat blue screen with sharp delineation between arm and background.`,
+The armored arm must appear as if it was photographed against a perfectly flat blue screen with sharp delineation between the medieval gauntlet and background.`,
             aspect_ratio: "1:1"
         });
 
