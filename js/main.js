@@ -4,7 +4,6 @@ import { initControls, setupMovementControls } from './controls.js';
 import { initSword, swordInventory, generateNewSword } from './sword.js';
 import { initInventorySystem, showInventory } from './inventory.js';
 import { setupAnimationLoop } from './animation.js';
-import './collision.js'; 
 
 // Initialize scene and renderer
 initScene();

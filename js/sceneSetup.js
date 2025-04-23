@@ -7,7 +7,6 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
-import { registerCollidable } from './collision.js';
 
 // Exported variables for use in other modules
 export let scene, camera, renderer, composer, fxaaPass;
@@ -174,9 +173,6 @@ function addRandomObjects() {
             rock.castShadow = true;
             rock.receiveShadow = true;
             scene.add(rock);
-            
-            // Register rock as collidable
-            registerCollidable(rock);
         } else {
             // Tree (simple cylinder and cone)
             const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.3, 1.5, 8);
@@ -202,10 +198,6 @@ function addRandomObjects() {
             
             scene.add(trunk);
             scene.add(leaves);
-            
-            // Register trunk and leaves as collidable
-            registerCollidable(trunk);
-            registerCollidable(leaves);
         }
     }
 }
