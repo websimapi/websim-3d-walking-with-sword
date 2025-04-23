@@ -18,7 +18,8 @@ export async function initMultiplayer() {
         position: { x: 0, y: 1.7, z: 0 },
         rotation: { y: 0 },
         equippedSword: -1,
-        swordSwinging: false
+        swordSwinging: false,
+        swordTexture: null // Initialize with no sword texture
     };
     
     room.updatePresence(initialPresence);
@@ -67,6 +68,9 @@ export async function initMultiplayer() {
         }
     };
     
+    // Update player count UI
+    updatePlayerCountUI();
+    
     console.log("Multiplayer initialized");
 }
 
@@ -91,14 +95,24 @@ export function updatePlayerPosition() {
         position: position,
         rotation: rotation
     });
+    
+    // Update player count UI
+    updatePlayerCountUI();
 }
 
 // Update player's equipped sword in presence
 export function updatePlayerSword(swordIndex) {
     if (!room) return;
     
+    // Get the texture URL of the sword to share with other players
+    let swordTextureUrl = null;
+    if (swordIndex >= 0 && swordIndex < swordInventory.length) {
+        swordTextureUrl = swordInventory[swordIndex].processedUrl;
+    }
+    
     room.updatePresence({
-        equippedSword: swordIndex
+        equippedSword: swordIndex,
+        swordTexture: swordTextureUrl
     });
 }
 
@@ -164,6 +178,9 @@ function updateOtherPlayers(presenceData) {
             delete otherPlayers[clientId];
         }
     });
+    
+    // Update player count UI
+    updatePlayerCountUI();
 }
 
 // Create visual representation for other player
@@ -171,8 +188,8 @@ function createPlayerRepresentation(clientId, playerData) {
     // Create a group to hold player model and sword
     const playerModel = new THREE.Group();
     
-    // Add a simple avatar representing the player (just a floating sword for now)
-    const avatarGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+    // Add a simple avatar representing the player body
+    const avatarGeometry = new THREE.CapsuleGeometry(0.3, 1.2, 4, 8);
     const avatarMaterial = new THREE.MeshBasicMaterial({ 
         color: 0x0088ff, 
         transparent: true, 
@@ -180,7 +197,7 @@ function createPlayerRepresentation(clientId, playerData) {
         wireframe: true
     });
     const avatar = new THREE.Mesh(avatarGeometry, avatarMaterial);
-    avatar.position.y = 1.7; // Eye level
+    avatar.position.y = 0.9; // Centered at ground + half height (for a 1.8 unit tall player)
     playerModel.add(avatar);
     
     // Add player name label if available
@@ -196,12 +213,13 @@ function createPlayerRepresentation(clientId, playerData) {
     swordGroup.position.y = 1.7; // Eye level
     playerModel.add(swordGroup);
     
-    // Position the player model
-    playerModel.position.copy(new THREE.Vector3(
+    // Position the player model on the ground
+    // We need to adjust: the model is placed at ground level, but the "head" is at player.position.y
+    playerModel.position.set(
         playerData.position.x,
-        playerData.position.y,
+        0, // Ground level
         playerData.position.z
-    ));
+    );
     
     // Add to scene
     scene.add(playerModel);
@@ -210,7 +228,8 @@ function createPlayerRepresentation(clientId, playerData) {
     otherPlayers[clientId] = {
         model: playerModel,
         swordGroup: swordGroup,
-        equippedSword: -1
+        equippedSword: -1,
+        avatar: avatar
     };
     
     // If they already have a sword equipped, render it
@@ -224,13 +243,18 @@ function updatePlayerRepresentation(clientId, playerData) {
     const player = otherPlayers[clientId];
     if (!player) return;
     
-    // Update position
+    // Update position - only update X and Z, keeping the model on the ground
     if (playerData.position) {
         player.model.position.set(
             playerData.position.x,
-            playerData.position.y,
+            0, // Keep at ground level
             playerData.position.z
         );
+        
+        // Update the sword group to be at eye level (approximately camera.y)
+        if (player.swordGroup) {
+            player.swordGroup.position.y = playerData.position.y;
+        }
     }
     
     // Update rotation if available
@@ -238,9 +262,10 @@ function updatePlayerRepresentation(clientId, playerData) {
         player.model.rotation.y = playerData.rotation.y;
     }
     
-    // Update sword if changed
-    if (playerData.equippedSword !== undefined && 
-        playerData.equippedSword !== player.equippedSword) {
+    // Update sword if changed or if the texture changed
+    if ((playerData.equippedSword !== undefined && 
+         playerData.equippedSword !== player.equippedSword) ||
+        (playerData.swordTexture !== player.swordTexture)) {
         updatePlayerSwordVisual(clientId, playerData);
     }
     
@@ -289,17 +314,45 @@ function updatePlayerSwordVisual(clientId, playerData) {
     // If no sword equipped, we're done
     if (playerData.equippedSword < 0) return;
     
-    // Create a simple sword representation for other players
-    // We don't have their actual sword texture, so we'll use a generic plane
-    const swordGeometry = new THREE.PlaneGeometry(0.3, 1);
-    const swordMaterial = new THREE.MeshBasicMaterial({
-        color: 0x4466ff,
-        transparent: true,
-        opacity: 0.8,
-        side: THREE.DoubleSide
-    });
+    // Store the texture URL in player data
+    player.swordTexture = playerData.swordTexture;
+    player.equippedSword = playerData.equippedSword;
     
-    const sword = new THREE.Mesh(swordGeometry, swordMaterial);
+    // Create the sword with the player's texture if available
+    let sword;
+    
+    if (playerData.swordTexture) {
+        // Use the shared texture
+        const swordTexture = new THREE.TextureLoader().load(playerData.swordTexture);
+        swordTexture.flipY = false;
+        
+        const swordMaterial = new THREE.MeshStandardMaterial({ 
+            map: swordTexture,
+            transparent: true,
+            side: THREE.DoubleSide,
+            alphaTest: 0.5,
+            emissive: 0x4466ff,
+            emissiveIntensity: 0,
+            metalness: 0.9,
+            roughness: 0.1,
+            envMapIntensity: 1.5
+        });
+        
+        const swordGeometry = new THREE.PlaneGeometry(1, 1);
+        sword = new THREE.Mesh(swordGeometry, swordMaterial);
+    } else {
+        // Fallback to generic sword
+        const swordGeometry = new THREE.PlaneGeometry(0.3, 1);
+        const swordMaterial = new THREE.MeshBasicMaterial({
+            color: 0x4466ff,
+            transparent: true,
+            opacity: 0.8,
+            side: THREE.DoubleSide
+        });
+        sword = new THREE.Mesh(swordGeometry, swordMaterial);
+    }
+    
+    // Set up sword positioning
     sword.rotation.y = Math.PI / 2;
     sword.rotation.z = -Math.PI / 8 - Math.PI / 6;
     sword.rotation.x = Math.PI / 6 + Math.PI;
@@ -307,7 +360,6 @@ function updatePlayerSwordVisual(clientId, playerData) {
     
     player.swordGroup.add(sword);
     player.sword = sword;
-    player.equippedSword = playerData.equippedSword;
 }
 
 // Animate other player's sword swing
@@ -359,4 +411,15 @@ function animatePlayerSwordSwing(clientId) {
     
     // Start animation
     animateSwing();
+}
+
+// Update the players counter in the UI
+function updatePlayerCountUI() {
+    if (!room) return;
+    
+    const playerCount = Object.keys(room.peers).length;
+    const connectedPlayersElement = document.getElementById('connected-players');
+    if (connectedPlayersElement) {
+        connectedPlayersElement.textContent = `Connected Players: ${playerCount}`;
+    }
 }
