@@ -224,18 +224,17 @@ export function equipSword(index) {
         const swordGeometry = new THREE.PlaneGeometry(1, 1);
         sword = new THREE.Mesh(swordGeometry, swordMaterial);
         
-        // Get rotation from inventory if available
-        const rotation = swordInventory[index].rotation || 0;
+        // Get rotation from inventory
+        const itemRotation = swordInventory[index].rotation || 0;
         
-        // Set up sword positioning - fixed rotation for correct leftward angle
-        sword.rotation.y = Math.PI / 2; // Base Y rotation
-        sword.rotation.z = -Math.PI / 8 - Math.PI / 6; // Base Z rotation (30 degrees left tilt)
-        sword.rotation.x = Math.PI / 6 + Math.PI; // Base X rotation
+        // Set up sword positioning with base rotations
+        sword.rotation.y = Math.PI / 2;
+        sword.rotation.z = -Math.PI / 8 - Math.PI / 6;
+        sword.rotation.x = Math.PI / 6 + Math.PI;
         
-        // Apply the saved inventory rotation (rotating around the Y axis in scene space)
-        if (rotation !== 0) {
-            sword.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), rotation * Math.PI / 180);
-        }
+        // Apply the inventory rotation using rotateOnWorldAxis to ensure consistent rotation
+        // regardless of the object's current orientation
+        sword.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), itemRotation * Math.PI / 180);
         
         // Enable shadow casting for the sword
         sword.castShadow = true;
@@ -351,7 +350,7 @@ export function equipArm(index) {
         currentArmIndex = index;
         armImage = armInventory[index].processedUrl;
         
-        // Recreate arm mesh with the new texture and rotation
+        // Recreate arm mesh with the new texture
         createArmMesh();
         
         // Show arm if no sword is equipped
@@ -389,18 +388,17 @@ function createArmMesh() {
     const armGeometry = new THREE.PlaneGeometry(1.2, 1.2);
     arm = new THREE.Mesh(armGeometry, armMaterial);
     
-    // Get rotation from inventory if available
-    const rotation = armInventory[currentArmIndex].rotation || 0;
+    // Get rotation from inventory
+    const itemRotation = armInventory[currentArmIndex].rotation || 0;
     
     // Set up arm positioning with base rotations
-    arm.rotation.y = Math.PI / 2; // Base Y rotation
-    arm.rotation.z = -Math.PI / 8 - Math.PI / 6; // Base Z rotation (30 degrees left tilt)
-    arm.rotation.x = Math.PI / 6 + Math.PI; // Base X rotation
+    arm.rotation.y = Math.PI / 2;
+    arm.rotation.z = -Math.PI / 8 - Math.PI / 6;
+    arm.rotation.x = Math.PI / 6 + Math.PI;
     
-    // Apply the saved inventory rotation (rotating around the Y axis in scene space)
-    if (rotation !== 0) {
-        arm.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), rotation * Math.PI / 180);
-    }
+    // Apply the inventory rotation using rotateOnWorldAxis to ensure consistent rotation
+    // regardless of the object's current orientation
+    arm.rotateOnWorldAxis(new THREE.Vector3(0, 1, 0), itemRotation * Math.PI / 180);
     
     // Show arm if no sword is equipped
     if (sword === null) {
