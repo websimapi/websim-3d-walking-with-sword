@@ -85,7 +85,8 @@ The sword must appear as if it was photographed against a perfectly flat blue sc
                 originalUrl: swordImage.url,
                 processedUrl: transparentSwordUrl,
                 name: `Sword ${swordInventory.length + 1}`,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                rotation: 0 // Initialize rotation to 0 degrees
             };
             
             swordInventory.push(swordData);
@@ -147,7 +148,8 @@ The arm must appear as if it was photographed against a perfectly flat white scr
                 originalUrl: armImageResult.url,
                 processedUrl: transparentArmUrl,
                 name: `Arm ${armInventory.length + 1}`,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                rotation: 0 // Initialize rotation to 0 degrees
             };
             
             armInventory.push(armData);
@@ -222,10 +224,16 @@ export function equipSword(index) {
         const swordGeometry = new THREE.PlaneGeometry(1, 1);
         sword = new THREE.Mesh(swordGeometry, swordMaterial);
         
+        // Get rotation from inventory if available
+        const rotation = swordInventory[index].rotation || 0;
+        
         // Set up sword positioning - fixed rotation for correct leftward angle
         sword.rotation.y = Math.PI / 2; // Reverted to original rotation
         sword.rotation.z = -Math.PI / 8 - Math.PI / 6; // Added 30 degrees left tilt on Z axis
-        sword.rotation.x = Math.PI / 6 + Math.PI; 
+        sword.rotation.x = Math.PI / 6 + Math.PI;
+        
+        // Apply the saved rotation (rotating around the Y axis in scene space)
+        sword.rotateOnAxis(new THREE.Vector3(0, 1, 0), rotation * Math.PI / 180);
         
         // Enable shadow casting for the sword
         sword.castShadow = true;
@@ -313,7 +321,8 @@ The arm must appear as if it was photographed against a perfectly flat white scr
                 originalUrl: armImageResult.url,
                 processedUrl: transparentArmUrl,
                 name: `Arm ${armInventory.length + 1}`,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                rotation: 0 // Initialize rotation to 0 degrees
             };
             
             armInventory.push(armData);
@@ -378,10 +387,16 @@ function createArmMesh() {
     const armGeometry = new THREE.PlaneGeometry(1.2, 1.2);
     arm = new THREE.Mesh(armGeometry, armMaterial);
     
+    // Get rotation from inventory if available
+    const rotation = armInventory[currentArmIndex].rotation || 0;
+    
     // Set up arm positioning
     arm.rotation.y = Math.PI / 2;
     arm.rotation.z = -Math.PI / 8 - Math.PI / 6;
     arm.rotation.x = Math.PI / 6 + Math.PI;
+    
+    // Apply the saved rotation (rotating around the Y axis in scene space)
+    arm.rotateOnAxis(new THREE.Vector3(0, 1, 0), rotation * Math.PI / 180);
     
     // Show arm if no sword is equipped
     if (sword === null) {
@@ -431,4 +446,41 @@ export function setSelectedSwordIndex(index) {
 
 export function setSelectedArmIndex(index) {
     selectedArmIndex = index;
+}
+
+// New functions for image rotation
+export function rotateSwordImage(index, rotationDelta) {
+    if (index >= 0 && index < swordInventory.length) {
+        // Initialize rotation if not set
+        if (swordInventory[index].rotation === undefined) {
+            swordInventory[index].rotation = 0;
+        }
+        
+        // Add rotation delta (90 or -90 degrees)
+        swordInventory[index].rotation = (swordInventory[index].rotation + rotationDelta) % 360;
+        
+        // Update equipped sword if this is the current sword
+        if (index === currentSwordIndex && sword) {
+            // Remove and recreate the sword with new rotation
+            equipSword(index);
+        }
+    }
+}
+
+export function rotateArmImage(index, rotationDelta) {
+    if (index >= 0 && index < armInventory.length) {
+        // Initialize rotation if not set
+        if (armInventory[index].rotation === undefined) {
+            armInventory[index].rotation = 0;
+        }
+        
+        // Add rotation delta (90 or -90 degrees)
+        armInventory[index].rotation = (armInventory[index].rotation + rotationDelta) % 360;
+        
+        // Update equipped arm if this is the current arm
+        if (index === currentArmIndex && arm) {
+            // Remove and recreate the arm with new rotation
+            equipArm(index);
+        }
+    }
 }

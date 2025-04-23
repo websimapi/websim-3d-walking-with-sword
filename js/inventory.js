@@ -9,7 +9,9 @@ import {
     selectedArmIndex,
     equipArm,
     generateNewArm,
-    setSelectedArmIndex 
+    setSelectedArmIndex,
+    rotateSwordImage,
+    rotateArmImage 
 } from './sword.js';
 
 export function initInventorySystem(controls) {
@@ -81,9 +83,18 @@ export function updateInventoryUI() {
         swordImg.src = sword.processedUrl;
         swordImg.alt = sword.name;
         
+        // Apply rotation if set
+        if (sword.rotation) {
+            swordImg.style.transform = `rotate(${sword.rotation}deg)`;
+        }
+        
         const swordLabel = document.createElement('div');
         swordLabel.className = 'sword-label';
         swordLabel.textContent = sword.name;
+        
+        // Create item controls container
+        const itemControls = document.createElement('div');
+        itemControls.className = 'item-controls';
         
         // Rename button
         const renameBtn = document.createElement('button');
@@ -98,9 +109,39 @@ export function updateInventoryUI() {
             }
         });
         
+        // Rotation controls
+        const rotationControls = document.createElement('div');
+        rotationControls.className = 'rotation-controls';
+        
+        const rotateLeftBtn = document.createElement('button');
+        rotateLeftBtn.className = 'rotate-btn';
+        rotateLeftBtn.innerHTML = '&#8634;'; // Counter-clockwise arrow
+        rotateLeftBtn.title = 'Rotate left';
+        rotateLeftBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            rotateSwordImage(index, -90);
+            updateInventoryUI();
+        });
+        
+        const rotateRightBtn = document.createElement('button');
+        rotateRightBtn.className = 'rotate-btn';
+        rotateRightBtn.innerHTML = '&#8635;'; // Clockwise arrow
+        rotateRightBtn.title = 'Rotate right';
+        rotateRightBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            rotateSwordImage(index, 90);
+            updateInventoryUI();
+        });
+        
+        rotationControls.appendChild(rotateLeftBtn);
+        rotationControls.appendChild(rotateRightBtn);
+        
+        itemControls.appendChild(renameBtn);
+        itemControls.appendChild(rotationControls);
+        
         swordItem.appendChild(swordImg);
         swordItem.appendChild(swordLabel);
-        swordItem.appendChild(renameBtn);
+        swordItem.appendChild(itemControls);
         
         swordItem.addEventListener('click', () => {
             selectSword(index);
@@ -122,9 +163,18 @@ export function updateInventoryUI() {
         armImg.src = arm.processedUrl;
         armImg.alt = arm.name;
         
+        // Apply rotation if set
+        if (arm.rotation) {
+            armImg.style.transform = `rotate(${arm.rotation}deg)`;
+        }
+        
         const armLabel = document.createElement('div');
         armLabel.className = 'arm-label';
         armLabel.textContent = arm.name;
+        
+        // Create item controls container
+        const itemControls = document.createElement('div');
+        itemControls.className = 'item-controls';
         
         // Rename button
         const renameBtn = document.createElement('button');
@@ -139,9 +189,39 @@ export function updateInventoryUI() {
             }
         });
         
+        // Rotation controls
+        const rotationControls = document.createElement('div');
+        rotationControls.className = 'rotation-controls';
+        
+        const rotateLeftBtn = document.createElement('button');
+        rotateLeftBtn.className = 'rotate-btn';
+        rotateLeftBtn.innerHTML = '&#8634;'; // Counter-clockwise arrow
+        rotateLeftBtn.title = 'Rotate left';
+        rotateLeftBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            rotateArmImage(index, -90);
+            updateInventoryUI();
+        });
+        
+        const rotateRightBtn = document.createElement('button');
+        rotateRightBtn.className = 'rotate-btn';
+        rotateRightBtn.innerHTML = '&#8635;'; // Clockwise arrow
+        rotateRightBtn.title = 'Rotate right';
+        rotateRightBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            rotateArmImage(index, 90);
+            updateInventoryUI();
+        });
+        
+        rotationControls.appendChild(rotateLeftBtn);
+        rotationControls.appendChild(rotateRightBtn);
+        
+        itemControls.appendChild(renameBtn);
+        itemControls.appendChild(rotationControls);
+        
         armItem.appendChild(armImg);
         armItem.appendChild(armLabel);
-        armItem.appendChild(renameBtn);
+        armItem.appendChild(itemControls);
         
         armItem.addEventListener('click', () => {
             selectArm(index);
