@@ -1,64 +1,66 @@
-// Controls.js - Movement and input handling
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-import { toggleInventory } from './sword.js';
+import { camera } from './scene.js';
+import { showInventory } from './inventory.js';
+
+// Control state
+export let controlsEnabled = true;
+export let controls = null;
 
 // Movement variables
-const velocity = new THREE.Vector3();
-const direction = new THREE.Vector3();
-let moveForward = false;
-let moveBackward = false;
-let moveLeft = false;
-let moveRight = false;
-let controls;
+export const velocity = new THREE.Vector3();
+export const direction = new THREE.Vector3();
+export let moveForward = false;
+export let moveBackward = false;
+export let moveLeft = false;
+export let moveRight = false;
 
-// Set up player controls
-export function setupControls(camera, scene) {
-    // Create pointer lock controls
-    controls = new PointerLockControls(camera, document.body);
+// Initialize controls
+export function setupControls(camera, domElement) {
+    controls = new PointerLockControls(camera, domElement);
     
-    // Menu state
-    let menuOpen = false;
-    
-    // Set up click handler to lock controls
+    // Event listeners
     document.addEventListener('click', function() {
         if (!menuOpen) {
             controls.lock();
         }
     });
     
-    // Handle lock/unlock events
     controls.addEventListener('lock', function() {
         document.getElementById('instructions').style.display = 'none';
         document.getElementById('inventory-container').style.display = 'none';
         menuOpen = false;
+        controlsEnabled = true;
     });
     
     controls.addEventListener('unlock', function() {
         // Don't show anything on unlock
+        controlsEnabled = false;
     });
     
-    // Handle keyboard input
+    // Keyboard controls
     setupKeyboardControls();
-    
-    // Set up animation update
-    setupMovementUpdate();
     
     return controls;
 }
 
-// Set up keyboard event handlers
+// Menu state
+export let menuOpen = false;
+
+// Keyboard input handling
 function setupKeyboardControls() {
-    // Handle key press
     document.addEventListener('keydown', function(event) {
         if (event.key === 'Escape' || event.key === 'i' || event.key === 'I') {
             if (controls.isLocked) {
                 controls.unlock();
                 setTimeout(() => {
-                    toggleInventory(true);
+                    showInventory();
+                    menuOpen = true;
                 }, 100);
-            } else if (document.getElementById('inventory-container').style.display === 'none') {
-                toggleInventory(true);
+            } else if (!document.getElementById('inventory-container').style.display || 
+                       document.getElementById('inventory-container').style.display === 'none') {
+                showInventory();
+                menuOpen = true;
             }
         }
         
@@ -82,7 +84,6 @@ function setupKeyboardControls() {
         }
     });
     
-    // Handle key release
     document.addEventListener('keyup', function(event) {
         switch(event.code) {
             case 'ArrowUp':
@@ -104,48 +105,26 @@ function setupKeyboardControls() {
         }
     });
     
-    // Handle mouse click for sword swinging
+    // Register mouse click for sword swinging
     document.addEventListener('mousedown', function(event) {
-        // Dispatch event to sword module
-        if (event.button === 0 && controls.isLocked) {
-            window.dispatchEvent(new CustomEvent('swordSwing'));
-        }
+        // This will be implemented in sword.js
     });
 }
 
-// Set up movement update (called each frame)
-function setupMovementUpdate() {
-    window.addEventListener('animate', function(e) {
-        const delta = e.detail.delta;
-        
-        // Movement code
-        velocity.x -= velocity.x * 10.0 * delta;
-        velocity.z -= velocity.z * 10.0 * delta;
-        
-        direction.z = Number(moveForward) - Number(moveBackward);
-        direction.x = Number(moveRight) - Number(moveLeft);
-        direction.normalize();
-        
-        if (moveForward || moveBackward) velocity.z -= direction.z * 20.0 * delta;
-        if (moveLeft || moveRight) velocity.x -= direction.x * 20.0 * delta;
-        
-        controls.moveRight(-velocity.x * delta);
-        controls.moveForward(-velocity.z * delta);
-    });
-}
-
-// Get control state
-export function isControlLocked() {
-    return controls ? controls.isLocked : false;
-}
-
-// Lock/unlock controls
-export function setControlLock(lock) {
-    if (controls) {
-        if (lock && !controls.isLocked) {
-            controls.lock();
-        } else if (!lock && controls.isLocked) {
-            controls.unlock();
-        }
-    }
+// Update player movement - called from animation loop
+export function updateMovement(delta) {
+    if (!controlsEnabled) return;
+    
+    velocity.x -= velocity.x * 10.0 * delta;
+    velocity.z -= velocity.z * 10.0 * delta;
+    
+    direction.z = Number(moveForward) - Number(moveBackward);
+    direction.x = Number(moveRight) - Number(moveLeft);
+    direction.normalize();
+    
+    if (moveForward || moveBackward) velocity.z -= direction.z * 20.0 * delta;
+    if (moveLeft || moveRight) velocity.x -= direction.x * 20.0 * delta;
+    
+    controls.moveRight(-velocity.x * delta);
+    controls.moveForward(-velocity.z * delta);
 }

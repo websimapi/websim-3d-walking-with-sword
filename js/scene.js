@@ -1,29 +1,95 @@
-// Environment.js - Scene setup, lighting, terrain
 import * as THREE from 'three';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { PMREMGenerator } from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 
-// Set up the environment including lighting, terrain, and background objects
-export function setupEnvironment(scene, renderer) {
-    // Add subtle fog to soften the distant objects
-    scene.fog = new THREE.FogExp2(0x6a9cc0, 0.008); // Exponential fog with the same color as background
-    
-    // Set up lighting
-    setupLighting(scene);
-    
-    // Set up ground plane
-    createGround(scene);
-    
-    // Add decorative objects
-    addRandomObjects(scene);
-    
+// Create and export the scene
+export const scene = new THREE.Scene();
+
+// Create and export the camera
+export const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.y = 1.7; // Eye height
+scene.add(camera);
+
+// Create and export the renderer
+export const renderer = new THREE.WebGLRenderer({ 
+    antialias: true,
+    powerPreference: "high-performance"
+});
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+// Enable physically correct lighting
+renderer.physicallyCorrectLights = true;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.8;
+
+// Improved shadow settings
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.autoUpdate = true;
+document.body.appendChild(renderer.domElement);
+
+// Post-processing setup
+export const composer = new EffectComposer(renderer);
+const renderPass = new RenderPass(scene, camera);
+composer.addPass(renderPass);
+
+// FXAA for anti-aliasing
+export const fxaaPass = new ShaderPass(FXAAShader);
+const pixelRatio = renderer.getPixelRatio();
+fxaaPass.material.uniforms['resolution'].value.x = 1 / (window.innerWidth * pixelRatio);
+fxaaPass.material.uniforms['resolution'].value.y = 1 / (window.innerHeight * pixelRatio);
+composer.addPass(fxaaPass);
+
+// Bloom effect for the sword
+export const bloomPass = new UnrealBloomPass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    0.6,  // strength
+    0.3,  // radius
+    0.4   // threshold
+);
+composer.addPass(bloomPass);
+
+// Final output pass
+const outputPass = new OutputPass();
+composer.addPass(outputPass);
+
+// Initialize scene with lighting and environment
+export function setupScene() {
     // Load HDR environment map
-    loadEnvironmentMap(scene, renderer);
+    const pmremGenerator = new PMREMGenerator(renderer);
+    pmremGenerator.compileEquirectangularShader();
+    
+    new RGBELoader()
+        .load('https://threejs.org/examples/textures/equirectangular/venice_sunset_1k.hdr', function(texture) {
+            const envMap = pmremGenerator.fromEquirectangular(texture).texture;
+            scene.environment = envMap;
+            scene.background = new THREE.Color(0x6a9cc0); // Darker, more muted blue color
+            
+            texture.dispose();
+            pmremGenerator.dispose();
+        });
+        
+    // Add subtle fog
+    scene.fog = new THREE.FogExp2(0x6a9cc0, 0.008);
+    
+    // Lighting
+    setupLighting();
+    
+    // Add ground and objects
+    createGround();
+    addRandomObjects();
 }
 
-// Set up all lights in the scene
-function setupLighting(scene) {
-    // Ambient light for base illumination
+// Set up lighting for the scene
+function setupLighting() {
     const ambientLight = new THREE.AmbientLight(0x404040, 0.3);
     scene.add(ambientLight);
     
@@ -37,7 +103,7 @@ function setupLighting(scene) {
     directionalLight.position.set(-5, 15, 8);
     directionalLight.castShadow = true;
     
-    // Configure shadow settings
+    // Higher resolution shadow map
     directionalLight.shadow.camera.near = 0.5;
     directionalLight.shadow.camera.far = 50;
     directionalLight.shadow.camera.left = -20;
@@ -50,14 +116,24 @@ function setupLighting(scene) {
     directionalLight.shadow.radius = 1;
     scene.add(directionalLight);
     
-    // Fill light for softer shadows
+    // Add a fill light
     const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
     fillLight.position.set(5, 5, -5);
     scene.add(fillLight);
+    
+    // Add a spotlight specifically to highlight the sword
+    const swordLight = new THREE.SpotLight(0x7777ff, 2.0);
+    swordLight.position.set(0, 3, 0);
+    swordLight.angle = Math.PI / 6;
+    swordLight.penumbra = 0.2;
+    swordLight.decay = 2;
+    swordLight.distance = 10;
+    camera.add(swordLight);
+    swordLight.target = camera;
 }
 
-// Create the ground plane
-function createGround(scene) {
+// Create ground plane
+function createGround() {
     const planeGeometry = new THREE.PlaneGeometry(2000, 2000, 128, 128);
     const planeMaterial = new THREE.MeshStandardMaterial({ 
         color: 0x339933,
@@ -72,24 +148,8 @@ function createGround(scene) {
     scene.add(plane);
 }
 
-// Load HDR environment map
-function loadEnvironmentMap(scene, renderer) {
-    const pmremGenerator = new PMREMGenerator(renderer);
-    pmremGenerator.compileEquirectangularShader();
-    
-    new RGBELoader()
-        .load('https://threejs.org/examples/textures/equirectangular/venice_sunset_1k.hdr', function(texture) {
-            const envMap = pmremGenerator.fromEquirectangular(texture).texture;
-            scene.environment = envMap;
-            scene.background = new THREE.Color(0x6a9cc0); // Darker, more muted blue color
-            
-            texture.dispose();
-            pmremGenerator.dispose();
-        });
-}
-
-// Add some random objects to show off lighting effects
-function addRandomObjects(scene) {
+// Add random objects to the scene
+function addRandomObjects() {
     // Add some rocks and trees
     for (let i = 0; i < 50; i++) {
         // Random position away from the player
