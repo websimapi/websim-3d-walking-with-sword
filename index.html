@@ -71,27 +71,28 @@
         document.body.appendChild(renderer.domElement);
         
         // Light setup - Enhanced lighting
-        const ambientLight = new THREE.AmbientLight(0x404040, 0.5); // Softer ambient light
+        const ambientLight = new THREE.AmbientLight(0x404040, 1.0); // Increased from 0.5 to 1.0
         scene.add(ambientLight);
         
         // Main directional light with enhanced shadows
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2); // Increased from 0.8 to 1.2
         directionalLight.position.set(5, 10, 7.5);
         directionalLight.castShadow = true;
         // Improve shadow quality and range
-        directionalLight.shadow.mapSize.width = 1024;
-        directionalLight.shadow.mapSize.height = 1024;
+        directionalLight.shadow.mapSize.width = 2048; // Increased from 1024
+        directionalLight.shadow.mapSize.height = 2048; // Increased from 1024
         directionalLight.shadow.camera.near = 0.5;
         directionalLight.shadow.camera.far = 50;
         directionalLight.shadow.camera.left = -20;
         directionalLight.shadow.camera.right = 20;
         directionalLight.shadow.camera.top = 20;
         directionalLight.shadow.camera.bottom = -20;
-        directionalLight.shadow.bias = -0.0005;
+        directionalLight.shadow.bias = -0.0001; // Adjusted for better shadow accuracy
+        directionalLight.shadow.normalBias = 0.02; // Added to fix shadow artifacts
         scene.add(directionalLight);
         
         // Add spotlight for dramatic effect
-        const spotLight = new THREE.SpotLight(0xffffcc, 0.8);
+        const spotLight = new THREE.SpotLight(0xffffcc, 1.0); // Increased from 0.8 to 1.0
         spotLight.position.set(-5, 8, 2);
         spotLight.angle = Math.PI / 6;
         spotLight.penumbra = 0.3;
@@ -99,6 +100,15 @@
         spotLight.shadow.mapSize.width = 1024;
         spotLight.shadow.mapSize.height = 1024;
         scene.add(spotLight);
+        
+        // Add sword-specific light to highlight it
+        const swordLight = new THREE.PointLight(0xffffff, 0.7);
+        swordLight.distance = 3;
+        let handOffset = new THREE.Object3D();
+        camera.add(handOffset);
+        handOffset.position.set(0.5, -0.2, -1); // Adjusted position slightly up
+        handOffset.add(swordLight);
+        swordLight.position.set(0, 0, 0.5);
         
         // Add a few random objects to showcase shadows
         function addRandomObjects() {
@@ -199,19 +209,14 @@
             }
         }
         
-        // Modify the hand offset position and rotation for better visibility
-        let sword = null;
-        let handOffset = new THREE.Object3D();
-        camera.add(handOffset);
-        handOffset.position.set(0.5, -0.3, -1); // Moved up a bit more
-        
         // Generate sword using AI
+        let sword = null;
         generateSword();
         
         async function generateSword() {
             try {
                 const swordImage = await websim.imageGen({
-                    prompt: "A vertical fantasy sword standing upright with blade pointing up and handle at bottom, ornate metal handle at the bottom and shiny blade extending upward, centered on pure blue background, full sword visible in frame",
+                    prompt: "A vertical fantasy sword standing upright with blade pointing up and handle at the bottom portion of the image, ornate metal handle at the bottom and shiny blade extending upward, centered on pure blue background, full sword visible in frame, highly detailed with gold and silver accents",
                     aspect_ratio: "1:1"
                 });
 
@@ -225,16 +230,19 @@
                     const swordTexture = new THREE.TextureLoader().load(transparentSwordUrl);
                     swordTexture.flipY = false;
                     
-                    // Use MeshStandardMaterial instead of MeshBasicMaterial for lighting effects
+                    // Use MeshStandardMaterial with enhanced properties
                     const swordMaterial = new THREE.MeshStandardMaterial({ 
                         map: swordTexture,
                         transparent: true,
                         side: THREE.DoubleSide,
                         alphaTest: 0.5,
-                        roughness: 0.4,
-                        metalness: 0.7 // Makes it look more like metal
+                        roughness: 0.3, // Lowered for more shine
+                        metalness: 0.8, // Increased for more metal look
+                        emissive: 0x111111, // Slight emissive to make it more visible
+                        emissiveIntensity: 0.2
                     });
                     
+                    // Create a box geometry for better shadow casting
                     const swordGeometry = new THREE.PlaneGeometry(1, 1);
                     sword = new THREE.Mesh(swordGeometry, swordMaterial);
                     
@@ -242,9 +250,23 @@
                     sword.rotation.z = -Math.PI / 8;
                     sword.rotation.x = Math.PI / 6 + Math.PI; 
                     
-                    // Enable shadows on the sword
+                    // Enhanced shadow properties
                     sword.castShadow = true;
                     sword.receiveShadow = true;
+                    
+                    // Create a separate shadow-casting object that follows the sword
+                    // This helps create a more accurate shadow
+                    const shadowCaster = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.05, 0.8, 0.2),
+                        new THREE.MeshBasicMaterial({ 
+                            transparent: true, 
+                            opacity: 0, // Invisible but casts shadow
+                            side: THREE.DoubleSide 
+                        })
+                    );
+                    shadowCaster.castShadow = true;
+                    shadowCaster.position.set(0, 0, 0);
+                    sword.add(shadowCaster);
                     
                     handOffset.add(sword);
                     
