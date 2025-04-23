@@ -48,7 +48,7 @@
         <p>Please wait while the AI creates your weapon</p>
     </div>
     <div id="instructions">
-        <p>WASD or Arrow Keys: Move | Mouse: Look around</p>
+        <p>WASD or Arrow Keys: Move | Mouse: Look around | Left Click: Swing Sword</p>
     </div>
     <script type="module">
         import * as THREE from 'three';
@@ -111,7 +111,14 @@
         let moveBackward = false;
         let moveLeft = false;
         let moveRight = false;
-        
+
+        // Add these variables after the movement variables
+        let isSwinging = false;
+        let swingProgress = 0;
+        const swingDuration = 0.3; // Duration of swing in seconds
+        const swingStartRotation = -Math.PI / 8; // Default rotation
+        const swingEndRotation = swingStartRotation - Math.PI * 1.5; // Full swing rotation
+
         // Handle key controls
         document.addEventListener('keydown', onKeyDown);
         document.addEventListener('keyup', onKeyUp);
@@ -246,6 +253,18 @@
             return canvas.toDataURL();
         }
         
+        // Modify the click event listener to handle sword swinging
+        document.addEventListener('mousedown', function(event) {
+            if (event.button === 0) { // Left click
+                if (!isSwinging) {
+                    isSwinging = true;
+                    swingProgress = 0;
+                }
+            } else {
+                controls.lock(); // Keep the pointer lock on other clicks
+            }
+        });
+
         // Animation loop
         const clock = new THREE.Clock();
         
@@ -266,13 +285,31 @@
             controls.moveRight(-velocity.x * delta);
             controls.moveForward(-velocity.z * delta);
             
+            // Update sword swing animation
             if (sword) {
-                sword.rotation.z = -Math.PI / 8 + Math.sin(clock.elapsedTime * 2) * 0.05;
+                if (isSwinging) {
+                    swingProgress += delta / swingDuration;
+                    if (swingProgress >= 1) {
+                        isSwinging = false;
+                        swingProgress = 0;
+                    }
+                    
+                    // Easing function for smooth swing
+                    const easeOut = 1 - Math.pow(1 - swingProgress, 3);
+                    const currentRotation = isSwinging
+                        ? swingStartRotation + (swingEndRotation - swingStartRotation) * easeOut
+                        : swingStartRotation;
+                    
+                    sword.rotation.z = currentRotation;
+                } else {
+                    // Idle sword animation
+                    sword.rotation.z = swingStartRotation + Math.sin(clock.elapsedTime * 2) * 0.05;
+                }
             }
             
             renderer.render(scene, camera);
         }
-        
+
         // Handle window resize
         window.addEventListener('resize', onWindowResize, false);
         
