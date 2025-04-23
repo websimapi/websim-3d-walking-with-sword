@@ -391,28 +391,6 @@
             const secondGlowLight = new THREE.PointLight(0x00aaff, 1.5, 1.5);
             secondGlowLight.position.set(0, 0.2, 0);
             swordGlowEffects.add(secondGlowLight);
-            
-            // Add a soft blue volumetric-like glow using a small sphere with emissive material
-            const glowSphereGeometry = new THREE.SphereGeometry(0.15, 16, 16);
-            const glowSphereMaterial = new THREE.MeshBasicMaterial({
-                color: 0x4466ff,
-                transparent: true,
-                opacity: 0.15,
-                blending: THREE.AdditiveBlending
-            });
-            const glowSphere = new THREE.Mesh(glowSphereGeometry, glowSphereMaterial);
-            swordGlowEffects.add(glowSphere);
-            
-            // Add a second smaller, brighter inner glow
-            const innerGlowGeometry = new THREE.SphereGeometry(0.08, 16, 16);
-            const innerGlowMaterial = new THREE.MeshBasicMaterial({
-                color: 0x66ccff,
-                transparent: true,
-                opacity: 0.2,
-                blending: THREE.AdditiveBlending
-            });
-            const innerGlow = new THREE.Mesh(innerGlowGeometry, innerGlowMaterial);
-            swordGlowEffects.add(innerGlow);
         }
         
         // Function to remove background from sword image
@@ -491,15 +469,6 @@
                         // Animate light intensity
                         glowEffect.intensity = (glowEffect.intensity * 0.95) + 
                             (1.5 + Math.sin(clock.elapsedTime * 3 + i) * 0.5) * 0.05;
-                    }
-                    if (glowEffect.type === 'Mesh' && glowEffect.material) {
-                        // Animate glow sphere scale slightly
-                        const pulseFactor = 1 + Math.sin(clock.elapsedTime * 2 + i) * 0.1;
-                        glowEffect.scale.set(pulseFactor, pulseFactor, pulseFactor);
-                        
-                        // Animate opacity
-                        glowEffect.material.opacity = glowEffect.material.opacity * 0.95 + 
-                            (0.1 + Math.sin(clock.elapsedTime * 4 + i) * 0.05) * 0.05;
                     }
                 }
             }
