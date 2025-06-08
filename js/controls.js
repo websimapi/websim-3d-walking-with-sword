@@ -3,7 +3,6 @@ import { PointerLockControls } from 'three/addons/controls/PointerLockControls.j
 import { camera } from './sceneSetup.js';
 import { showInventory } from './inventory.js';
 import { handleSwordSwing } from './sword.js';
-import { updatePlayerPosition, room, broadcastSwordSwing } from './multiplayer.js';
 
 // Movement state
 export const movementState = {
@@ -35,19 +34,11 @@ export function initControls(camera, domElement) {
         // Don't show anything on unlock
     });
     
-    // Add event listener for movements to update position in multiplayer
-    controls.addEventListener('change', function() {
-        // Update player position in multiplayer
-        updatePlayerPosition();
-    });
-    
     // Mouse click for sword swinging
     document.addEventListener('mousedown', function(event) {
         // Left mouse button (button 0)
         if (event.button === 0 && controls.isLocked) {
             handleSwordSwing();
-            // Also broadcast the swing to other players
-            broadcastSwordSwing();
         }
     });
     

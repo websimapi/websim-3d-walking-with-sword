@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { scene, camera } from './sceneSetup.js';
 import { removeSwordBackground } from './utils.js';
-import { updatePlayerSword } from './multiplayer.js';
 
 // Sword and hand positioning
 export let handOffset = new THREE.Object3D();
@@ -153,9 +152,6 @@ export function equipSword(index) {
         
         // Add sword glow effect
         addSwordGlowEffect();
-        
-        // Update multiplayer state with equipped sword
-        updatePlayerSword(index);
     }
 }
 

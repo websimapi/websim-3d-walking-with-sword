@@ -4,7 +4,6 @@ import { initControls, setupMovementControls } from './controls.js';
 import { initSword, swordInventory, generateNewSword } from './sword.js';
 import { initInventorySystem, showInventory } from './inventory.js';
 import { setupAnimationLoop } from './animation.js';
-import { initMultiplayer } from './multiplayer.js';
 
 // Initialize scene and renderer
 initScene();
@@ -20,11 +19,6 @@ initInventorySystem(controls);
 
 // Set up movement controls
 setupMovementControls();
-
-// Initialize multiplayer
-initMultiplayer().then(() => {
-    console.log("Multiplayer ready");
-});
 
 // Generate first sword and start inventory
 generateNewSword();

@@ -2,11 +2,9 @@ import * as THREE from 'three';
 import { composer, scene, camera } from './sceneSetup.js';
 import { controls, movementState } from './controls.js';
 import { sword, handOffset, swordGlowEffects, swingState } from './sword.js';
-import { updatePlayerPosition } from './multiplayer.js';
 
 // Animation clock
 const clock = new THREE.Clock();
-let lastUpdateTime = 0;
 
 export function setupAnimationLoop() {
     animate();
@@ -17,19 +15,12 @@ function animate() {
     requestAnimationFrame(animate);
     
     const delta = clock.getDelta();
-    const elapsedTime = clock.getElapsedTime();
     
     // Movement code
     updateMovement(delta);
     
     // Handle sword animation
     updateSwordAnimation(delta);
-    
-    // Update player position for multiplayer at a reasonable rate (5 times per second)
-    if (elapsedTime - lastUpdateTime > 0.2) {
-        updatePlayerPosition();
-        lastUpdateTime = elapsedTime;
-    }
     
     // Use composer instead of renderer
     composer.render();
